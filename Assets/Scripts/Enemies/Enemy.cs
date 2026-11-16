@@ -7,18 +7,13 @@ namespace HollowKeep.Enemies
 {
     public abstract class Enemy : MonoBehaviour
     {
-        [Header("Atributos")]
-        [SerializeField] private int maxHealth = 100;
-        [SerializeField] private float moveSpeed = 3.5f;
-        [SerializeField] private int goldReward = 15;
-        [SerializeField] private int damageToCastle = 1;
-        [SerializeField] private float waypointTolerance = 0.15f;
+        public abstract int MaxHealth { get; }
+        public abstract float MoveSpeed { get; }
+        public abstract int GoldReward { get; }
+        public abstract int DamageToCastle { get; }
+        protected virtual float WaypointTolerance => 0.15f;
 
         public int CurrentHealth { get; private set; }
-        public int MaxHealth => maxHealth;
-        public float MoveSpeed => moveSpeed;
-        public int GoldReward => goldReward;
-        public int DamageToCastle => damageToCastle;
         public bool IsDead => CurrentHealth <= 0;
 
         public event Action<Enemy> OnDied;
@@ -30,7 +25,7 @@ namespace HollowKeep.Enemies
 
         protected virtual void Awake()
         {
-            CurrentHealth = maxHealth;
+            CurrentHealth = MaxHealth;
         }
 
         public virtual void Initialize(IReadOnlyList<Waypoint> waypoints)
@@ -73,8 +68,8 @@ namespace HollowKeep.Enemies
             Vector3 toTarget = targetPos - transform.position;
             toTarget.y = 0f; // Mantém no plano XZ se for terreno plano
 
-            float step = moveSpeed * Time.deltaTime;
-            if (toTarget.magnitude <= waypointTolerance)
+            float step = MoveSpeed * Time.deltaTime;
+            if (toTarget.magnitude <= WaypointTolerance)
             {
                 _currentWaypointIndex++;
                 if (_currentWaypointIndex >= _waypoints.Count)

@@ -121,10 +121,10 @@ classDiagram
 
     class Enemy {
         <<abstract MonoBehaviour>>
-        -int maxHealth
-        -float moveSpeed
-        -int goldReward
-        -int damageToCastle
+        +int MaxHealth*
+        +float MoveSpeed*
+        +int GoldReward*
+        +int DamageToCastle*
         +Initialize(IReadOnlyList~Waypoint~)
         +TakeDamage(int)
         +event OnDied
@@ -220,12 +220,12 @@ sequenceDiagram
 
 ### 5.3. Inimigos (`HollowKeep.Enemies`)
 * **`Enemy` (classe abstrata):**
-  * **Atributos serializados:** `maxHealth` (100), `moveSpeed` (3.5), `goldReward` (15), `damageToCastle` (1), `waypointTolerance` (0.15).
-  * **Estado e propriedades:** `CurrentHealth`, `IsDead` (`CurrentHealth <= 0`), além dos getters dos atributos.
+  * **Atributos fixos por classe (propriedades abstratas, não serializadas):** `MaxHealth`, `MoveSpeed`, `GoldReward`, `DamageToCastle` (e `WaypointTolerance` virtual com padrão `0.15f`). Cada tipo de inimigo define seus próprios valores fixos em código, evitando inconsistências entre prefabs.
+  * **Estado e propriedades:** `CurrentHealth`, `IsDead` (`CurrentHealth <= 0`).
   * **Ciclo de vida:**
-    * `Awake()`: inicializa `CurrentHealth = maxHealth`.
+    * `Awake()`: inicializa `CurrentHealth = MaxHealth`.
     * `Initialize(IReadOnlyList<Waypoint> waypoints)`: guarda a lista, zera `_currentWaypointIndex`, teleporta o inimigo para `_waypoints[0].Position` e ativa `_isInitialized`.
-    * `Update()` -> `MoveAlongPath()`: calcula direção no plano XZ (`toTarget.y = 0f`). Se `toTarget.magnitude <= waypointTolerance`, avança o índice; ao ultrapassar o último waypoint, chama `ReachEnd()`. Caso contrário, move com `Vector3.MoveTowards` e rotaciona suavemente com `Quaternion.Slerp`.
+    * `Update()` -> `MoveAlongPath()`: calcula direção no plano XZ (`toTarget.y = 0f`). Se `toTarget.magnitude <= WaypointTolerance`, avança o índice; ao ultrapassar o último waypoint, chama `ReachEnd()`. Caso contrário, move com `Vector3.MoveTowards` usando `MoveSpeed` e rotaciona suavemente com `Quaternion.Slerp`.
     * `TakeDamage(int damage)`: reduz `CurrentHealth` (limitado a `0`) e chama `Die()` ao zerar.
     * `Die()` e `ReachEnd()`: invocam respectivamente `OnDied?.Invoke(this)` e `OnReachedEnd?.Invoke(this)`, e depois executam `Destroy(gameObject)`.
 * **Como criar um novo tipo de inimigo (ex: Esqueleto, Vampiro, Orc):**
@@ -234,9 +234,13 @@ sequenceDiagram
   {
       public class SkeletonEnemy : Enemy
       {
+          public override int MaxHealth => 80;
+          public override float MoveSpeed => 3.5f;
+          public override int GoldReward => 15;
+          public override int DamageToCastle => 1;
+
           // Sobrescreva Awake(), MoveAlongPath(), TakeDamage() ou Die()
           // apenas se este inimigo tiver comportamento especial (ex.: animação, som, partículas).
-          // Caso contrário, basta herdar de Enemy e configurar os atributos no Prefab!
       }
   }
   ```

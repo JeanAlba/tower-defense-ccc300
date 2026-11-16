@@ -44,13 +44,7 @@ namespace HollowKeep.Editor
                 temp.name = "TestMinion";
                 temp.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
 
-                TestMinionEnemy enemyComp = temp.AddComponent<TestMinionEnemy>();
-                SerializedObject enemySo = new SerializedObject(enemyComp);
-                enemySo.FindProperty("maxHealth").intValue = 60;
-                enemySo.FindProperty("moveSpeed").floatValue = 3.5f;
-                enemySo.FindProperty("goldReward").intValue = 10;
-                enemySo.FindProperty("damageToCastle").intValue = 1;
-                enemySo.ApplyModifiedProperties();
+                temp.AddComponent<TestMinionEnemy>();
 
                 // Material URP simples avermelhado
                 Shader urpShader = Shader.Find("Universal Render Pipeline/Lit");

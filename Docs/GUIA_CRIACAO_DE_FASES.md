@@ -84,11 +84,7 @@ Qualquer inimigo no jogo herda da classe base `Enemy`:
 
 1. Crie um modelo 3D simples (ex: Cubo ou Esfera para Greybox, ou modelo Kenney).
 2. Adicione um `Collider` (para futuros disparos de torres) e o script do monstro (ex: `TestMinionEnemy` ou outro derivado de `Enemy`).
-3. No Inspector, configure:
-   * **Max Health:** Vida total (ex: `100`).
-   * **Move Speed:** Velocidade de caminhada (ex: `3.5`).
-   * **Gold Reward:** Ouro concedido ao morrer (ex: `15`).
-   * **Damage To Castle:** Dano causado se chegar ao castelo (ex: `1`).
+3. Os atributos (`MaxHealth`, `MoveSpeed`, `GoldReward`, `DamageToCastle`) são **fixos no código C#** de cada classe de inimigo (não precisam ser configurados no Inspector).
 4. Arraste o objeto para a pasta `Assets/Prefabs/Enemies/` para transformá-lo em um **Prefab**.
 
 ---

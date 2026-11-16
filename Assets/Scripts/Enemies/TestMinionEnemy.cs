@@ -4,10 +4,9 @@ namespace HollowKeep.Enemies
 {
     public class TestMinionEnemy : Enemy
     {
-        // Classe concreta mínima para testes de movimentação e spawn
-        protected override void Awake()
-        {
-            base.Awake();
-        }
+        public override int MaxHealth => 60;
+        public override float MoveSpeed => 3.5f;
+        public override int GoldReward => 10;
+        public override int DamageToCastle => 1;
     }
 }
