@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1de44cfb2f6232eb5857858f9968d94a, type: 3}
+  m_Name: Level_01
+  m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Level.Data.LevelData
+  levelId: Level_01
+  startingGold: 150
+  timeBetweenWaves: 5
+  waves:
+  - duration: 12
+    subwaves:
+    - wavePercentage: 0
+      spawnGroups:
+      - enemyPrefab: {fileID: 1150759039790972967, guid: 808fe32c5a546852aa8f92ec2ec775f2, type: 3}
+        quantity: 3
+        interval: 1.2
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 50
+      spawnGroups:
+      - enemyPrefab: {fileID: 1150759039790972967, guid: 808fe32c5a546852aa8f92ec2ec775f2, type: 3}
+        quantity: 4
+        interval: 0.8
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
