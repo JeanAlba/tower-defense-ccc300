@@ -15,6 +15,25 @@ namespace HollowKeep.Enemies
 
         public int CurrentHealth { get; private set; }
         public bool IsDead => CurrentHealth <= 0;
+        public int CurrentWaypointIndex => _currentWaypointIndex;
+
+        public float DistanceToNextWaypoint
+        {
+            get
+            {
+                if (_waypoints == null || _currentWaypointIndex >= _waypoints.Count || _waypoints[_currentWaypointIndex] == null)
+                {
+                    return 0f;
+                }
+
+                Vector3 diff = _waypoints[_currentWaypointIndex].Position - transform.position;
+                diff.y = 0f;
+                return diff.magnitude;
+            }
+        }
+
+        private static readonly List<Enemy> _activeEnemies = new();
+        public static IReadOnlyList<Enemy> ActiveEnemies => _activeEnemies;
 
         public event Action<Enemy> OnDied;
         public event Action<Enemy> OnReachedEnd;
@@ -22,6 +41,19 @@ namespace HollowKeep.Enemies
         private IReadOnlyList<Waypoint> _waypoints;
         private int _currentWaypointIndex;
         private bool _isInitialized;
+
+        protected virtual void OnEnable()
+        {
+            if (!_activeEnemies.Contains(this))
+            {
+                _activeEnemies.Add(this);
+            }
+        }
+
+        protected virtual void OnDisable()
+        {
+            _activeEnemies.Remove(this);
+        }
 
         protected virtual void Awake()
         {
