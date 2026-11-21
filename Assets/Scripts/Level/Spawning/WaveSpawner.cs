@@ -30,14 +30,19 @@ namespace HollowKeep.Level.Spawning
         public int TotalWaves => (levelData != null) ? levelData.TotalWaves : 0;
         public int AliveEnemiesCount => aliveEnemiesCount;
         public bool IsWaveActive => isWaveActive;
+        public bool IsInIntermission => _isInIntermission;
 
         public event Action<int, int> OnWaveStarted;          // (waveIndex, totalWaves)
         public event Action<int> OnWaveCompleted;             // (waveIndex)
         public event Action OnAllWavesCompleted;
         public event Action<float> OnIntermissionTick;         // segundos restantes no intervalo
+        public event Action<float, float> OnIntermissionUpdated; // (segundos restantes, duração total)
+        public event Action<Enemy> OnEnemySpawned;
 
         private Coroutine _levelRoutine;
         private readonly List<Coroutine> _activeSpawnCoroutines = new();
+        private bool _isInIntermission;
+        private bool _skipIntermissionRequested;
 
         private void Awake()
         {
@@ -86,6 +91,20 @@ namespace HollowKeep.Level.Spawning
             _levelRoutine = StartCoroutine(RunLevelRoutine());
         }
 
+        /// <summary>
+        /// Adianta o início da próxima onda caso um intervalo esteja ativo.
+        /// </summary>
+        public bool SkipIntermission()
+        {
+            if (!_isInIntermission)
+            {
+                return false;
+            }
+
+            _skipIntermissionRequested = true;
+            return true;
+        }
+
         private IEnumerator RunLevelRoutine()
         {
             currentWaveIndex = -1;
@@ -96,14 +115,30 @@ namespace HollowKeep.Level.Spawning
                 WaveData wave = levelData.Waves[w];
 
                 // Intervalo de descanso antes da onda (se configurado)
-                float intermission = (w == 0) ? 3f : levelData.TimeBetweenWaves;
-                while (intermission > 0f)
+                float intermissionDuration = (w == 0) ? 3f : levelData.TimeBetweenWaves;
+                float intermission = intermissionDuration;
+                _isInIntermission = intermission > 0f;
+                _skipIntermissionRequested = false;
+
+                int lastReportedSecond = -1;
+                while (intermission > 0f && !_skipIntermissionRequested)
                 {
-                    OnIntermissionTick?.Invoke(intermission);
-                    yield return new WaitForSeconds(1f);
-                    intermission -= 1f;
+                    int currentSecond = Mathf.CeilToInt(intermission);
+                    if (currentSecond != lastReportedSecond)
+                    {
+                        lastReportedSecond = currentSecond;
+                        OnIntermissionTick?.Invoke(currentSecond);
+                    }
+
+                    OnIntermissionUpdated?.Invoke(Mathf.Max(0f, intermission), intermissionDuration);
+                    yield return null;
+                    intermission -= Time.deltaTime;
                 }
+
+                _isInIntermission = false;
+                _skipIntermissionRequested = false;
                 OnIntermissionTick?.Invoke(0f);
+                OnIntermissionUpdated?.Invoke(0f, intermissionDuration);
 
                 // Execução da onda
                 yield return StartCoroutine(ExecuteWaveRoutine(wave, w));
@@ -203,6 +238,8 @@ namespace HollowKeep.Level.Spawning
                 // Subscreve nos eventos do inimigo para decrementar a contagem
                 enemy.OnDied += HandleEnemyRemoved;
                 enemy.OnReachedEnd += HandleEnemyRemoved;
+
+                OnEnemySpawned?.Invoke(enemy);
 
                 if (i < group.Quantity - 1)
                 {
