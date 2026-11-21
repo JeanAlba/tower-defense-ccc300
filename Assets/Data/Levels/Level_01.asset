@@ -14,19 +14,53 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Level.Data.LevelData
   levelId: Level_01
   startingGold: 150
-  timeBetweenWaves: 5
+  timeBetweenWaves: 10
   waves:
-  - duration: 12
+  - duration: 14
     subwaves:
     - wavePercentage: 0
       spawnGroups:
-      - enemyPrefab: {fileID: 1150759039790972967, guid: 808fe32c5a546852aa8f92ec2ec775f2, type: 3}
-        quantity: 3
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 4
+        interval: 1.5
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 55
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 4
+        interval: 1.2
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+  - duration: 18
+    subwaves:
+    - wavePercentage: 0
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 6
         interval: 1.2
         targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
     - wavePercentage: 50
       spawnGroups:
-      - enemyPrefab: {fileID: 1150759039790972967, guid: 808fe32c5a546852aa8f92ec2ec775f2, type: 3}
-        quantity: 4
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 6
+        interval: 1
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+  - duration: 22
+    subwaves:
+    - wavePercentage: 0
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 8
+        interval: 1
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 45
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 8
         interval: 0.8
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 80
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 6
+        interval: 0.7
         targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
