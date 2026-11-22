@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using HollowKeep.Enemies;
 using HollowKeep.Level.Spawning;
@@ -30,6 +31,7 @@ namespace HollowKeep.UI
         [SerializeField] private UnityEngine.UI.Button pauseButton;
         [SerializeField] private GameObject pausePopup;
         [SerializeField] private UnityEngine.UI.Button resumeButton;
+        [SerializeField] private UnityEngine.UI.Button restartButton;
         [SerializeField] private UnityEngine.UI.Button mainMenuButton;
 
         [Header("Configuração Inicial")]
@@ -41,6 +43,11 @@ namespace HollowKeep.UI
         private int _currentLives;
         private bool _isPaused;
         private bool _allWavesCompleted;
+
+        public int CurrentGold => _currentGold;
+        public bool IsPaused => _isPaused;
+
+        public event Action<int> OnGoldChanged;
 
         private void Awake()
         {
@@ -76,6 +83,11 @@ namespace HollowKeep.UI
                 resumeButton.onClick.AddListener(HandleResumeClicked);
             }
 
+            if (restartButton != null)
+            {
+                restartButton.onClick.AddListener(HandleRestartClicked);
+            }
+
             if (mainMenuButton != null)
             {
                 mainMenuButton.onClick.AddListener(HandleMainMenuClicked);
@@ -93,6 +105,7 @@ namespace HollowKeep.UI
             SetPaused(false);
             UpdateWaveDisplay(0, waveSpawner != null ? waveSpawner.TotalWaves : 0);
             RefreshResourceDisplays();
+            OnGoldChanged?.Invoke(_currentGold);
 
             if (waveSpawner != null && waveSpawner.IsInIntermission)
             {
@@ -130,6 +143,11 @@ namespace HollowKeep.UI
                 resumeButton.onClick.RemoveListener(HandleResumeClicked);
             }
 
+            if (restartButton != null)
+            {
+                restartButton.onClick.RemoveListener(HandleRestartClicked);
+            }
+
             if (mainMenuButton != null)
             {
                 mainMenuButton.onClick.RemoveListener(HandleMainMenuClicked);
@@ -155,6 +173,25 @@ namespace HollowKeep.UI
         {
             _currentGold = Mathf.Max(0, amount);
             RefreshResourceDisplays();
+            OnGoldChanged?.Invoke(_currentGold);
+        }
+
+        public bool CanAfford(int amount)
+        {
+            return _currentGold >= Mathf.Max(0, amount);
+        }
+
+        public bool TrySpendGold(int amount)
+        {
+            if (amount < 0 || _currentGold < amount)
+            {
+                return false;
+            }
+
+            _currentGold -= amount;
+            RefreshResourceDisplays();
+            OnGoldChanged?.Invoke(_currentGold);
+            return true;
         }
 
         public void SetLives(int amount)
@@ -236,6 +273,7 @@ namespace HollowKeep.UI
             {
                 _currentGold += enemy.GoldReward;
                 RefreshResourceDisplays();
+                OnGoldChanged?.Invoke(_currentGold);
             }
         }
 
@@ -277,6 +315,12 @@ namespace HollowKeep.UI
         private void HandleResumeClicked()
         {
             SetPaused(false);
+        }
+
+        private void HandleRestartClicked()
+        {
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
         private void HandleMainMenuClicked()
