@@ -26,7 +26,7 @@ namespace HollowKeep.Enemies
                     return 0f;
                 }
 
-                Vector3 diff = _waypoints[_currentWaypointIndex].Position - transform.position;
+                Vector3 diff = GetWaypointTargetPosition(_currentWaypointIndex) - transform.position;
                 diff.y = 0f;
                 return diff.magnitude;
             }
@@ -40,6 +40,7 @@ namespace HollowKeep.Enemies
 
         private IReadOnlyList<Waypoint> _waypoints;
         private int _currentWaypointIndex;
+        private float _lateralOffset;
         private bool _isInitialized;
 
         protected virtual void OnEnable()
@@ -70,8 +71,14 @@ namespace HollowKeep.Enemies
 
             _waypoints = waypoints;
             _currentWaypointIndex = 0;
-            transform.position = _waypoints[0].Position;
+            _lateralOffset = UnityEngine.Random.Range(-1f, 1f);
+            transform.position = GetWaypointTargetPosition(0);
             _isInitialized = true;
+        }
+
+        private Vector3 GetWaypointTargetPosition(int index)
+        {
+            return EnemyPath.GetOffsetPosition(_waypoints, index, _lateralOffset);
         }
 
         protected virtual void Update()
@@ -96,7 +103,7 @@ namespace HollowKeep.Enemies
                 return;
             }
 
-            Vector3 targetPos = target.Position;
+            Vector3 targetPos = GetWaypointTargetPosition(_currentWaypointIndex);
             Vector3 toTarget = targetPos - transform.position;
             toTarget.y = 0f; // Mantém no plano XZ se for terreno plano
 
