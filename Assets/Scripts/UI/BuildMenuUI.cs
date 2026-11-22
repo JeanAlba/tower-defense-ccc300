@@ -94,7 +94,7 @@ namespace HollowKeep.UI
 
         private void Update()
         {
-            if (hudController != null && hudController.IsPaused)
+            if (hudController != null && hudController.IsInputBlocked)
             {
                 if (menuPanel != null && menuPanel.gameObject.activeSelf)
                 {
@@ -284,7 +284,7 @@ namespace HollowKeep.UI
                 return;
             }
 
-            if (hudController != null && hudController.IsPaused)
+            if (hudController != null && hudController.IsInputBlocked)
             {
                 return;
             }

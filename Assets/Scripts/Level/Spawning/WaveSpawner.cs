@@ -105,6 +105,24 @@ namespace HollowKeep.Level.Spawning
             return true;
         }
 
+        /// <summary>
+        /// Interrompe imediatamente o fluxo de ondas e rotinas de spawn em andamento.
+        /// </summary>
+        public void StopSpawning()
+        {
+            if (_levelRoutine != null)
+            {
+                StopCoroutine(_levelRoutine);
+                _levelRoutine = null;
+            }
+
+            StopAllCoroutines();
+            _activeSpawnCoroutines.Clear();
+            _isInIntermission = false;
+            _skipIntermissionRequested = false;
+            isWaveActive = false;
+        }
+
         private IEnumerator RunLevelRoutine()
         {
             currentWaveIndex = -1;

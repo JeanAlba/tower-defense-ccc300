@@ -34,6 +34,11 @@ namespace HollowKeep.UI
         [SerializeField] private UnityEngine.UI.Button restartButton;
         [SerializeField] private UnityEngine.UI.Button mainMenuButton;
 
+        [Header("Derrota (Game Over)")]
+        [SerializeField] private GameObject gameOverPopup;
+        [SerializeField] private UnityEngine.UI.Button gameOverRetryButton;
+        [SerializeField] private UnityEngine.UI.Button gameOverExitButton;
+
         [Header("Configuração Inicial")]
         [Min(1)]
         [SerializeField] private int startingLives = 20;
@@ -42,10 +47,13 @@ namespace HollowKeep.UI
         private int _currentGold;
         private int _currentLives;
         private bool _isPaused;
+        private bool _isGameOver;
         private bool _allWavesCompleted;
 
         public int CurrentGold => _currentGold;
         public bool IsPaused => _isPaused;
+        public bool IsGameOver => _isGameOver;
+        public bool IsInputBlocked => _isPaused || _isGameOver;
 
         public event Action<int> OnGoldChanged;
 
@@ -92,6 +100,16 @@ namespace HollowKeep.UI
             {
                 mainMenuButton.onClick.AddListener(HandleMainMenuClicked);
             }
+
+            if (gameOverRetryButton != null)
+            {
+                gameOverRetryButton.onClick.AddListener(HandleRestartClicked);
+            }
+
+            if (gameOverExitButton != null)
+            {
+                gameOverExitButton.onClick.AddListener(HandleMainMenuClicked);
+            }
         }
 
         private void Start()
@@ -100,7 +118,18 @@ namespace HollowKeep.UI
                 ? waveSpawner.CurrentLevelData.StartingGold
                 : 0;
             _currentLives = startingLives;
+            _isGameOver = false;
             _allWavesCompleted = false;
+
+            if (gameOverPopup != null)
+            {
+                gameOverPopup.SetActive(false);
+            }
+
+            if (pauseButton != null)
+            {
+                pauseButton.interactable = true;
+            }
 
             SetPaused(false);
             UpdateWaveDisplay(0, waveSpawner != null ? waveSpawner.TotalWaves : 0);
@@ -152,6 +181,16 @@ namespace HollowKeep.UI
             {
                 mainMenuButton.onClick.RemoveListener(HandleMainMenuClicked);
             }
+
+            if (gameOverRetryButton != null)
+            {
+                gameOverRetryButton.onClick.RemoveListener(HandleRestartClicked);
+            }
+
+            if (gameOverExitButton != null)
+            {
+                gameOverExitButton.onClick.RemoveListener(HandleMainMenuClicked);
+            }
         }
 
         private void OnDestroy()
@@ -198,6 +237,11 @@ namespace HollowKeep.UI
         {
             _currentLives = Mathf.Max(0, amount);
             RefreshResourceDisplays();
+
+            if (_currentLives <= 0 && !_isGameOver)
+            {
+                TriggerGameOver();
+            }
         }
 
         private void HandleWaveStarted(int waveIndex, int totalWaves)
@@ -284,6 +328,11 @@ namespace HollowKeep.UI
             {
                 _currentLives = Mathf.Max(0, _currentLives - enemy.DamageToCastle);
                 RefreshResourceDisplays();
+
+                if (_currentLives <= 0 && !_isGameOver)
+                {
+                    TriggerGameOver();
+                }
             }
         }
 
@@ -299,7 +348,7 @@ namespace HollowKeep.UI
 
         private void HandleAdvanceWaveClicked()
         {
-            if (_isPaused || waveSpawner == null)
+            if (_isPaused || _isGameOver || waveSpawner == null)
             {
                 return;
             }
@@ -309,6 +358,11 @@ namespace HollowKeep.UI
 
         private void HandlePauseClicked()
         {
+            if (_isGameOver)
+            {
+                return;
+            }
+
             SetPaused(!_isPaused);
         }
 
@@ -335,12 +389,51 @@ namespace HollowKeep.UI
 
         private void SetPaused(bool paused)
         {
+            if (_isGameOver)
+            {
+                return;
+            }
+
             _isPaused = paused;
             Time.timeScale = _isPaused ? 0f : 1f;
 
             if (pausePopup != null)
             {
                 pausePopup.SetActive(_isPaused);
+            }
+        }
+
+        private void TriggerGameOver()
+        {
+            if (_isGameOver)
+            {
+                return;
+            }
+
+            _isGameOver = true;
+            _isPaused = false;
+
+            if (pausePopup != null)
+            {
+                pausePopup.SetActive(false);
+            }
+
+            if (pauseButton != null)
+            {
+                pauseButton.interactable = false;
+            }
+
+            if (advanceWaveButton != null)
+            {
+                advanceWaveButton.interactable = false;
+            }
+
+            waveSpawner?.StopSpawning();
+            Time.timeScale = 0f;
+
+            if (gameOverPopup != null)
+            {
+                gameOverPopup.SetActive(true);
             }
         }
 
