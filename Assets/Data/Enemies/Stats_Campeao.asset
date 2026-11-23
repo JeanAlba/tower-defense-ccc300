@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8561ae927a6542c59ee5c746132afa26, type: 3}
+  m_Name: Stats_Campeao
+  m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Enemies.EnemyStatsData
+  enemyName: "Campe\xE3o"
+  maxHealth: 900
+  moveSpeed: 1.55
+  goldReward: 60
+  damageToCastle: 8

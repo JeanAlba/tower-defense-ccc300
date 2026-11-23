@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20f3f921df6f4ef3a729b79c0b08257c, type: 3}
+  m_Name: Difficulty_Normal
+  m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Level.Data.DifficultyProfile
+  difficultyId: Normal
+  displayName: Normal
+  description: "Experi\xEAncia padr\xE3o equilibrada com 20 vidas no castelo."
+  startingLives: 20
+  startingGoldMultiplier: 1
+  goldRewardMultiplier: 1
+  enemyHealthMultiplier: 1
+  enemySpeedMultiplier: 1
+  spawnQuantityMultiplier: 1
+  spawnIntervalMultiplier: 1
+  timeBetweenWavesMultiplier: 1
