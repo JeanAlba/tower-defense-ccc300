@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using HollowKeep.Enemies;
+using HollowKeep.Level.Data;
 using HollowKeep.Level.Spawning;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -24,10 +25,22 @@ namespace HollowKeep.UI
         [Header("Próxima Onda (Inferior Direito)")]
         [SerializeField] private UnityEngine.UI.Button advanceWaveButton;
         [SerializeField] private UnityEngine.UI.Image advanceWaveTimerFill;
+        [SerializeField] private UnityEngine.UI.Image advanceWaveIcon;
+        [SerializeField] private Sprite advanceWaveActiveSprite;
+        [SerializeField] private Sprite advanceWaveDisabledSprite;
+        [SerializeField] private GameObject advanceWaveDisabledBar;
         [SerializeField] private TMPro.TMP_Text advanceWaveLabelText;
         [SerializeField] private TMPro.TMP_Text advanceWaveTimerText;
+        [SerializeField] private bool animateInitialPrepTimerFill = false;
+        [Min(0)]
+        [SerializeField] private int earlyWaveGoldPerSecond = 1;
 
-        [Header("Pausa (Superior Direito e Popup)")]
+        [Header("Velocidade e Pausa (Superior Direito e Popup)")]
+        [SerializeField] private bool showSpeedButton = true;
+        [SerializeField] private UnityEngine.UI.Button speedButton;
+        [SerializeField] private TMPro.TMP_Text speedButtonText;
+        [Min(1f)]
+        [SerializeField] private float fastForwardScale = 2f;
         [SerializeField] private UnityEngine.UI.Button pauseButton;
         [SerializeField] private GameObject pausePopup;
         [SerializeField] private UnityEngine.UI.Button resumeButton;
@@ -39,21 +52,42 @@ namespace HollowKeep.UI
         [SerializeField] private UnityEngine.UI.Button gameOverRetryButton;
         [SerializeField] private UnityEngine.UI.Button gameOverExitButton;
 
+        [Header("Vitória")]
+        [SerializeField] private GameObject victoryPopup;
+        [SerializeField] private UnityEngine.UI.Button victoryNextLevelButton;
+        [Tooltip("Nome da próxima cena a carregar ao vencer. Se vazio ou indisponível, avança no Build Settings ou volta ao menu.")]
+        [SerializeField] private string nextLevelSceneName = "";
+
         [Header("Configuração Inicial")]
         [Min(1)]
         [SerializeField] private int startingLives = 20;
+
+        [Header("Dificuldade")]
+        [Tooltip("Perfil padrão usado quando a cena inicia sem seleção prévia no menu.")]
+        [SerializeField] private DifficultyProfile defaultDifficulty;
+
+        public DifficultyProfile ActiveDifficulty => GameSessionConfig.Resolve(
+            defaultDifficulty != null ? defaultDifficulty : (waveSpawner != null ? waveSpawner.ActiveDifficulty : null)
+        );
 
         private readonly HashSet<Enemy> _trackedEnemies = new();
         private int _currentGold;
         private int _currentLives;
         private bool _isPaused;
         private bool _isGameOver;
+        private bool _isVictory;
+        private bool _isBriefingOpen;
+        private bool _isFastForward;
+        private bool _hasStartedFirstWave;
         private bool _allWavesCompleted;
 
         public int CurrentGold => _currentGold;
         public bool IsPaused => _isPaused;
         public bool IsGameOver => _isGameOver;
-        public bool IsInputBlocked => _isPaused || _isGameOver;
+        public bool IsVictory => _isVictory;
+        public bool IsBriefingOpen => _isBriefingOpen;
+        public bool IsFastForward => _isFastForward;
+        public bool IsInputBlocked => _isPaused || _isGameOver || _isVictory || _isBriefingOpen;
 
         public event Action<int> OnGoldChanged;
 
@@ -79,6 +113,11 @@ namespace HollowKeep.UI
             if (advanceWaveButton != null)
             {
                 advanceWaveButton.onClick.AddListener(HandleAdvanceWaveClicked);
+            }
+
+            if (speedButton != null)
+            {
+                speedButton.onClick.AddListener(HandleSpeedClicked);
             }
 
             if (pauseButton != null)
@@ -110,15 +149,19 @@ namespace HollowKeep.UI
             {
                 gameOverExitButton.onClick.AddListener(HandleMainMenuClicked);
             }
+
+            if (victoryNextLevelButton != null)
+            {
+                victoryNextLevelButton.onClick.AddListener(HandleNextLevelClicked);
+            }
         }
 
         private void Start()
         {
-            _currentGold = (waveSpawner != null && waveSpawner.CurrentLevelData != null)
-                ? waveSpawner.CurrentLevelData.StartingGold
-                : 0;
-            _currentLives = startingLives;
             _isGameOver = false;
+            _isVictory = false;
+            _isFastForward = false;
+            _hasStartedFirstWave = false;
             _allWavesCompleted = false;
 
             if (gameOverPopup != null)
@@ -126,24 +169,97 @@ namespace HollowKeep.UI
                 gameOverPopup.SetActive(false);
             }
 
-            if (pauseButton != null)
+            if (victoryPopup != null)
             {
-                pauseButton.interactable = true;
+                victoryPopup.SetActive(false);
             }
 
+            if (speedButton != null)
+            {
+                speedButton.gameObject.SetActive(showSpeedButton);
+                speedButton.interactable = !_isBriefingOpen;
+            }
+
+            if (pauseButton != null)
+            {
+                pauseButton.interactable = !_isBriefingOpen;
+            }
+
+            ApplySessionDifficulty();
             SetPaused(false);
+            RefreshSpeedButtonDisplay();
             UpdateWaveDisplay(0, waveSpawner != null ? waveSpawner.TotalWaves : 0);
-            RefreshResourceDisplays();
-            OnGoldChanged?.Invoke(_currentGold);
 
             if (waveSpawner != null && waveSpawner.IsInIntermission)
             {
-                SetAdvanceWaveState(true, "--");
+                int secondsRemaining = Mathf.CeilToInt(waveSpawner.IntermissionRemainingSeconds);
+                SetAdvanceWaveState(true, secondsRemaining > 0 ? FormatIntermissionCounter(secondsRemaining) : "--");
             }
             else
             {
                 SetAdvanceWaveState(false, "--");
             }
+        }
+
+        /// <summary>
+        /// Recarrega ouro inicial e vidas do castelo com base na dificuldade ativa da sessão.
+        /// </summary>
+        public void ApplySessionDifficulty()
+        {
+            DifficultyProfile difficulty = ActiveDifficulty;
+            int baseGold = (waveSpawner != null && waveSpawner.CurrentLevelData != null)
+                ? waveSpawner.CurrentLevelData.StartingGold
+                : 0;
+            _currentGold = difficulty != null ? difficulty.GetStartingGold(baseGold) : baseGold;
+            _currentLives = difficulty != null ? difficulty.StartingLives : startingLives;
+            RefreshResourceDisplays();
+            OnGoldChanged?.Invoke(_currentGold);
+        }
+
+        /// <summary>
+        /// Bloqueia ou libera a HUD e o tempo de jogo enquanto o popup pré-fase estiver aberto.
+        /// </summary>
+        public void SetBriefingActive(bool active)
+        {
+            _isBriefingOpen = active;
+
+            if (active)
+            {
+                _isPaused = false;
+                if (pausePopup != null)
+                {
+                    pausePopup.SetActive(false);
+                }
+
+                if (speedButton != null)
+                {
+                    speedButton.interactable = false;
+                }
+
+                if (pauseButton != null)
+                {
+                    pauseButton.interactable = false;
+                }
+
+                if (advanceWaveButton != null)
+                {
+                    advanceWaveButton.interactable = false;
+                }
+            }
+            else if (!_isGameOver && !_isVictory)
+            {
+                if (speedButton != null)
+                {
+                    speedButton.interactable = true;
+                }
+
+                if (pauseButton != null)
+                {
+                    pauseButton.interactable = true;
+                }
+            }
+
+            ApplyActiveTimeScale();
         }
 
         private void OnDisable()
@@ -160,6 +276,11 @@ namespace HollowKeep.UI
             if (advanceWaveButton != null)
             {
                 advanceWaveButton.onClick.RemoveListener(HandleAdvanceWaveClicked);
+            }
+
+            if (speedButton != null)
+            {
+                speedButton.onClick.RemoveListener(HandleSpeedClicked);
             }
 
             if (pauseButton != null)
@@ -190,6 +311,11 @@ namespace HollowKeep.UI
             if (gameOverExitButton != null)
             {
                 gameOverExitButton.onClick.RemoveListener(HandleMainMenuClicked);
+            }
+
+            if (victoryNextLevelButton != null)
+            {
+                victoryNextLevelButton.onClick.RemoveListener(HandleNextLevelClicked);
             }
         }
 
@@ -233,6 +359,18 @@ namespace HollowKeep.UI
             return true;
         }
 
+        public void AddGold(int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            _currentGold += amount;
+            RefreshResourceDisplays();
+            OnGoldChanged?.Invoke(_currentGold);
+        }
+
         public void SetLives(int amount)
         {
             _currentLives = Mathf.Max(0, amount);
@@ -246,6 +384,7 @@ namespace HollowKeep.UI
 
         private void HandleWaveStarted(int waveIndex, int totalWaves)
         {
+            _hasStartedFirstWave = true;
             UpdateWaveDisplay(waveIndex + 1, totalWaves);
             SetAdvanceWaveState(false, "--");
         }
@@ -259,7 +398,7 @@ namespace HollowKeep.UI
 
             if (secondsRemaining > 0f)
             {
-                SetAdvanceWaveState(true, $"{Mathf.CeilToInt(secondsRemaining)}s");
+                SetAdvanceWaveState(true, FormatIntermissionCounter(Mathf.CeilToInt(secondsRemaining)));
             }
             else
             {
@@ -274,7 +413,8 @@ namespace HollowKeep.UI
                 return;
             }
 
-            advanceWaveTimerFill.fillAmount = (totalDuration > 0f)
+            bool shouldAnimate = (_hasStartedFirstWave || animateInitialPrepTimerFill) && totalDuration > 0f;
+            advanceWaveTimerFill.fillAmount = shouldAnimate
                 ? Mathf.Clamp01(secondsRemaining / totalDuration)
                 : 0f;
         }
@@ -296,6 +436,21 @@ namespace HollowKeep.UI
             if (advanceWaveTimerText != null)
             {
                 advanceWaveTimerText.text = "OK";
+            }
+
+            if (advanceWaveDisabledBar != null)
+            {
+                advanceWaveDisabledBar.SetActive(true);
+            }
+
+            if (advanceWaveIcon != null && advanceWaveDisabledSprite != null)
+            {
+                advanceWaveIcon.sprite = advanceWaveDisabledSprite;
+            }
+
+            if (!_isGameOver && _currentLives > 0)
+            {
+                TriggerVictory();
             }
         }
 
@@ -348,17 +503,53 @@ namespace HollowKeep.UI
 
         private void HandleAdvanceWaveClicked()
         {
-            if (_isPaused || _isGameOver || waveSpawner == null)
+            if (IsInputBlocked || waveSpawner == null)
             {
                 return;
             }
 
-            waveSpawner.SkipIntermission();
+            int secondsRemaining = Mathf.CeilToInt(waveSpawner.IntermissionRemainingSeconds);
+            int earlyGoldBonus = _hasStartedFirstWave ? CalculateEarlyWaveGoldBonus(secondsRemaining) : 0;
+
+            if (waveSpawner.SkipIntermission() && earlyGoldBonus > 0)
+            {
+                _currentGold += earlyGoldBonus;
+                RefreshResourceDisplays();
+                OnGoldChanged?.Invoke(_currentGold);
+            }
+        }
+
+        public void SetSpeedButtonVisible(bool visible)
+        {
+            showSpeedButton = visible;
+            if (speedButton != null)
+            {
+                speedButton.gameObject.SetActive(visible);
+            }
+
+            if (!visible && _isFastForward)
+            {
+                _isFastForward = false;
+                ApplyActiveTimeScale();
+                RefreshSpeedButtonDisplay();
+            }
+        }
+
+        private void HandleSpeedClicked()
+        {
+            if (IsInputBlocked || !showSpeedButton)
+            {
+                return;
+            }
+
+            _isFastForward = !_isFastForward;
+            ApplyActiveTimeScale();
+            RefreshSpeedButtonDisplay();
         }
 
         private void HandlePauseClicked()
         {
-            if (_isGameOver)
+            if (_isGameOver || _isVictory || _isBriefingOpen)
             {
                 return;
             }
@@ -377,6 +568,26 @@ namespace HollowKeep.UI
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
+        private void HandleNextLevelClicked()
+        {
+            Time.timeScale = 1f;
+
+            if (!string.IsNullOrWhiteSpace(nextLevelSceneName) && Application.CanStreamedLevelBeLoaded(nextLevelSceneName))
+            {
+                SceneManager.LoadScene(nextLevelSceneName);
+                return;
+            }
+
+            int nextBuildIndex = SceneManager.GetActiveScene().buildIndex + 1;
+            if (nextBuildIndex > 0 && nextBuildIndex < SceneManager.sceneCountInBuildSettings)
+            {
+                SceneManager.LoadScene(nextBuildIndex);
+                return;
+            }
+
+            HandleMainMenuClicked();
+        }
+
         private void HandleMainMenuClicked()
         {
             Time.timeScale = 1f;
@@ -389,13 +600,13 @@ namespace HollowKeep.UI
 
         private void SetPaused(bool paused)
         {
-            if (_isGameOver)
+            if (_isGameOver || _isVictory)
             {
                 return;
             }
 
-            _isPaused = paused;
-            Time.timeScale = _isPaused ? 0f : 1f;
+            _isPaused = !_isBriefingOpen && paused;
+            ApplyActiveTimeScale();
 
             if (pausePopup != null)
             {
@@ -405,7 +616,7 @@ namespace HollowKeep.UI
 
         private void TriggerGameOver()
         {
-            if (_isGameOver)
+            if (_isGameOver || _isVictory)
             {
                 return;
             }
@@ -416,6 +627,11 @@ namespace HollowKeep.UI
             if (pausePopup != null)
             {
                 pausePopup.SetActive(false);
+            }
+
+            if (speedButton != null)
+            {
+                speedButton.interactable = false;
             }
 
             if (pauseButton != null)
@@ -429,11 +645,69 @@ namespace HollowKeep.UI
             }
 
             waveSpawner?.StopSpawning();
-            Time.timeScale = 0f;
+            ApplyActiveTimeScale();
 
             if (gameOverPopup != null)
             {
                 gameOverPopup.SetActive(true);
+            }
+        }
+
+        private void TriggerVictory()
+        {
+            if (_isVictory || _isGameOver)
+            {
+                return;
+            }
+
+            _isVictory = true;
+            _isPaused = false;
+
+            if (pausePopup != null)
+            {
+                pausePopup.SetActive(false);
+            }
+
+            if (speedButton != null)
+            {
+                speedButton.interactable = false;
+            }
+
+            if (pauseButton != null)
+            {
+                pauseButton.interactable = false;
+            }
+
+            if (advanceWaveButton != null)
+            {
+                advanceWaveButton.interactable = false;
+            }
+
+            ApplyActiveTimeScale();
+
+            if (victoryPopup != null)
+            {
+                victoryPopup.SetActive(true);
+            }
+        }
+
+        private void ApplyActiveTimeScale()
+        {
+            if (_isPaused || _isGameOver || _isVictory || _isBriefingOpen)
+            {
+                Time.timeScale = 0f;
+                return;
+            }
+
+            Time.timeScale = _isFastForward ? Mathf.Max(1f, fastForwardScale) : 1f;
+        }
+
+        private void RefreshSpeedButtonDisplay()
+        {
+            if (speedButtonText != null)
+            {
+                int multiplierLabel = _isFastForward ? Mathf.RoundToInt(Mathf.Max(1f, fastForwardScale)) : 1;
+                speedButtonText.text = $"{multiplierLabel}X";
             }
         }
 
@@ -465,9 +739,30 @@ namespace HollowKeep.UI
                 advanceWaveButton.interactable = canAdvance;
             }
 
+            if (advanceWaveDisabledBar != null)
+            {
+                advanceWaveDisabledBar.SetActive(!canAdvance);
+            }
+
+            if (advanceWaveIcon != null)
+            {
+                Sprite targetSprite = canAdvance ? advanceWaveActiveSprite : advanceWaveDisabledSprite;
+                if (targetSprite != null)
+                {
+                    advanceWaveIcon.sprite = targetSprite;
+                }
+            }
+
             if (advanceWaveLabelText != null)
             {
-                advanceWaveLabelText.text = canAdvance ? "ADIANTAR ONDA" : "EM COMBATE";
+                if (!canAdvance)
+                {
+                    advanceWaveLabelText.text = "EM COMBATE";
+                }
+                else
+                {
+                    advanceWaveLabelText.text = _hasStartedFirstWave ? "ADIANTAR ONDA" : "INICIAR FASE";
+                }
             }
 
             if (advanceWaveTimerText != null)
@@ -475,10 +770,33 @@ namespace HollowKeep.UI
                 advanceWaveTimerText.text = timerText;
             }
 
-            if (!canAdvance && advanceWaveTimerFill != null)
+            bool shouldClearFill = !canAdvance || (!_hasStartedFirstWave && !animateInitialPrepTimerFill);
+            if (shouldClearFill && advanceWaveTimerFill != null)
             {
                 advanceWaveTimerFill.fillAmount = 0f;
             }
+        }
+
+        private int CalculateEarlyWaveGoldBonus(int secondsRemaining)
+        {
+            if (secondsRemaining <= 0 || earlyWaveGoldPerSecond <= 0)
+            {
+                return 0;
+            }
+
+            float goldMult = ActiveDifficulty != null ? ActiveDifficulty.GoldRewardMultiplier : 1f;
+            return Mathf.Max(0, Mathf.RoundToInt(secondsRemaining * earlyWaveGoldPerSecond * goldMult));
+        }
+
+        private string FormatIntermissionCounter(int secondsRemaining)
+        {
+            if (!_hasStartedFirstWave)
+            {
+                return $"{secondsRemaining}s";
+            }
+
+            int goldBonus = CalculateEarlyWaveGoldBonus(secondsRemaining);
+            return $"+{goldBonus} OURO";
         }
     }
 }
