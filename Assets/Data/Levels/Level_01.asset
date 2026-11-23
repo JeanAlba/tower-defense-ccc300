@@ -13,54 +13,119 @@ MonoBehaviour:
   m_Name: Level_01
   m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Level.Data.LevelData
   levelId: Level_01
+  stageTitle: FASE 1
+  stageDescription: "Sauda\xE7\xF5es, Comandante!\n\nEsqueletos e criaturas do cemit\xE9rio marcham pela estrada antiga rumo a Hollow Keep. Posicione arqueiros e canh\xF5es antes que a noite caia!"
+  mapPreviewVariant: 0
   startingGold: 150
-  timeBetweenWaves: 10
+  timeBetweenWaves: 12
   waves:
-  - duration: 14
-    subwaves:
-    - wavePercentage: 0
-      spawnGroups:
-      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
-        quantity: 4
-        interval: 1.5
-        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
-    - wavePercentage: 55
-      spawnGroups:
-      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
-        quantity: 4
-        interval: 1.2
-        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
-  - duration: 18
-    subwaves:
-    - wavePercentage: 0
-      spawnGroups:
-      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
-        quantity: 6
-        interval: 1.2
-        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
-    - wavePercentage: 50
-      spawnGroups:
-      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
-        quantity: 6
-        interval: 1
-        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
   - duration: 22
     subwaves:
     - wavePercentage: 0
       spawnGroups:
       - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
-        quantity: 8
-        interval: 1
+        quantity: 5
+        interval: 1.4
         targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
-    - wavePercentage: 45
+    - wavePercentage: 35
       spawnGroups:
       - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
-        quantity: 8
-        interval: 0.8
+        quantity: 5
+        interval: 1.2
         targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
-    - wavePercentage: 80
+  - duration: 32
+    subwaves:
+    - wavePercentage: 0
       spawnGroups:
       - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
         quantity: 6
-        interval: 0.7
+        interval: 1.1
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 32
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752197, guid: 2f3954cc83364a2682894c59c531aa18, type: 3}
+        quantity: 6
+        interval: 0.8
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 65
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 6
+        interval: 1
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+  - duration: 42
+    subwaves:
+    - wavePercentage: 0
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 10
+        interval: 0.9
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 30
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752197, guid: 2f3954cc83364a2682894c59c531aa18, type: 3}
+        quantity: 8
+        interval: 0.75
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 62
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752199, guid: ae963747ba9041f1b1186725b4625e52, type: 3}
+        quantity: 3
+        interval: 2.5
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+  - duration: 50
+    subwaves:
+    - wavePercentage: 0
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752197, guid: 2f3954cc83364a2682894c59c531aa18, type: 3}
+        quantity: 12
+        interval: 0.65
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 30
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752198, guid: a5eb5b16de9b4a4780ad3e4266bd9503, type: 3}
+        quantity: 8
+        interval: 1.2
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 62
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752199, guid: ae963747ba9041f1b1186725b4625e52, type: 3}
+        quantity: 4
+        interval: 2.2
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+  - duration: 58
+    subwaves:
+    - wavePercentage: 0
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752196, guid: b4bfcbf266d44bc488da97361cc3bced, type: 3}
+        quantity: 14
+        interval: 0.9
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+      - enemyPrefab: {fileID: 2864985385982752199, guid: ae963747ba9041f1b1186725b4625e52, type: 3}
+        quantity: 2
+        interval: 3
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 30
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752197, guid: 2f3954cc83364a2682894c59c531aa18, type: 3}
+        quantity: 10
+        interval: 0.6
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+      - enemyPrefab: {fileID: 2864985385982752198, guid: a5eb5b16de9b4a4780ad3e4266bd9503, type: 3}
+        quantity: 4
+        interval: 1.2
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+    - wavePercentage: 62
+      spawnGroups:
+      - enemyPrefab: {fileID: 2864985385982752199, guid: ae963747ba9041f1b1186725b4625e52, type: 3}
+        quantity: 2
+        interval: 2.2
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+      - enemyPrefab: {fileID: 2864985385982752198, guid: a5eb5b16de9b4a4780ad3e4266bd9503, type: 3}
+        quantity: 2
+        interval: 1.3
+        targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
+      - enemyPrefab: {fileID: 2864985385982752200, guid: e0a2b68c2cfd4d5682174b6dfe50c2f5, type: 3}
+        quantity: 1
+        interval: 1
         targetPath: {fileID: 11400000, guid: 65113dd78277e4a138b3afd6db599e7e, type: 2}
