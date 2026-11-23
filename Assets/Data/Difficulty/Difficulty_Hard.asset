@@ -14,12 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Level.Data.DifficultyProfile
   difficultyId: Hard
   displayName: "Dif\xEDcil"
-  description: "Inimigos mais resistentes e r\xE1pidos, hordas maiores e menos ouro e vidas iniciais."
+  description: "Inimigos mais resistentes e r\xE1pidos, hordas maiores e menos ouro
+    e vidas iniciais."
   startingLives: 10
-  startingGoldMultiplier: 0.8
+  startingGoldMultiplier: 0.85
   goldRewardMultiplier: 0.85
   enemyHealthMultiplier: 1.35
   enemySpeedMultiplier: 1.15
   spawnQuantityMultiplier: 1.25
   spawnIntervalMultiplier: 0.85
   timeBetweenWavesMultiplier: 0.75
+  matchTimeLimitMultiplier: 0.85
