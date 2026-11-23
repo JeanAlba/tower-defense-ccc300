@@ -31,6 +31,10 @@ namespace HollowKeep.Level.Data
         [Min(0f)]
         [SerializeField] private float timeBetweenWaves = 15f;
 
+        [Tooltip("Tempo máximo total da partida em segundos (base antes do multiplicador de dificuldade). Se esgotar antes da vitória, ocorre derrota.")]
+        [Min(30f)]
+        [SerializeField] private float matchTimeLimitSeconds = 300f;
+
         [Header("Ondas")]
         [Tooltip("Lista sequencial e ordenada de ondas que compõem este nível.")]
         [SerializeField] private List<WaveData> waves = new();
@@ -41,6 +45,7 @@ namespace HollowKeep.Level.Data
         public int MapPreviewVariant => mapPreviewVariant;
         public int StartingGold => startingGold;
         public float TimeBetweenWaves => timeBetweenWaves;
+        public float MatchTimeLimitSeconds => matchTimeLimitSeconds;
         public IReadOnlyList<WaveData> Waves => waves;
         public int TotalWaves => waves != null ? waves.Count : 0;
     }

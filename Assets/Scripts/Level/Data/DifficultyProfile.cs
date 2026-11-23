@@ -37,6 +37,10 @@ namespace HollowKeep.Level.Data
         [Min(0.1f)]
         [SerializeField] private float timeBetweenWavesMultiplier = 1f;
 
+        [Tooltip("Multiplicador do tempo máximo de partida (ex.: 1.0 no Normal, 0.85 no Difícil).")]
+        [Min(0.25f)]
+        [SerializeField] private float matchTimeLimitMultiplier = 1f;
+
         public string DifficultyId => difficultyId;
         public string DisplayName => displayName;
         public string Description => description;
@@ -48,6 +52,7 @@ namespace HollowKeep.Level.Data
         public float SpawnQuantityMultiplier => spawnQuantityMultiplier;
         public float SpawnIntervalMultiplier => spawnIntervalMultiplier;
         public float TimeBetweenWavesMultiplier => timeBetweenWavesMultiplier;
+        public float MatchTimeLimitMultiplier => matchTimeLimitMultiplier;
 
         public int GetStartingGold(int baseStartingGold)
         {
@@ -67,6 +72,11 @@ namespace HollowKeep.Level.Data
         public float GetScaledTimeBetweenWaves(float baseTime)
         {
             return Mathf.Max(0f, baseTime * timeBetweenWavesMultiplier);
+        }
+
+        public float GetScaledMatchTimeLimit(float baseTimeLimitSeconds)
+        {
+            return Mathf.Max(30f, baseTimeLimitSeconds * matchTimeLimitMultiplier);
         }
     }
 }

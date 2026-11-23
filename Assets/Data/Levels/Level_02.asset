@@ -20,6 +20,7 @@ MonoBehaviour:
   mapPreviewVariant: 1
   startingGold: 180
   timeBetweenWaves: 12
+  matchTimeLimitSeconds: 330
   waves:
   - duration: 26
     subwaves:

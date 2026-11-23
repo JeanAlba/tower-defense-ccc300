@@ -2384,7 +2384,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "CR\xC9DITOS"
+  m_text: SOBRE
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 25a2d3c3cec402d6c89811b8fbbe0997, type: 2}
   m_sharedMaterial: {fileID: -383975374118819330, guid: 25a2d3c3cec402d6c89811b8fbbe0997, type: 2}
@@ -2752,7 +2752,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "CR\xC9DITOS"
+  m_text: SOBRE
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 25a2d3c3cec402d6c89811b8fbbe0997, type: 2}
   m_sharedMaterial: {fileID: -383975374118819330, guid: 25a2d3c3cec402d6c89811b8fbbe0997, type: 2}

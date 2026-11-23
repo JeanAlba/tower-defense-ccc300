@@ -23,3 +23,4 @@ MonoBehaviour:
   spawnQuantityMultiplier: 1
   spawnIntervalMultiplier: 1
   timeBetweenWavesMultiplier: 1
+  matchTimeLimitMultiplier: 1

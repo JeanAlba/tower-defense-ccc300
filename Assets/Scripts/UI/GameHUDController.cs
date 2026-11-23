@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using HollowKeep.Audio;
 using HollowKeep.Enemies;
 using HollowKeep.Level.Data;
 using HollowKeep.Level.Spawning;
@@ -21,6 +22,7 @@ namespace HollowKeep.UI
         [SerializeField] private TMPro.TMP_Text waveText;
         [SerializeField] private TMPro.TMP_Text goldText;
         [SerializeField] private TMPro.TMP_Text livesText;
+        [SerializeField] private TMPro.TMP_Text matchTimerText;
 
         [Header("Próxima Onda (Inferior Direito)")]
         [SerializeField] private UnityEngine.UI.Button advanceWaveButton;
@@ -51,16 +53,20 @@ namespace HollowKeep.UI
         [SerializeField] private GameObject gameOverPopup;
         [SerializeField] private UnityEngine.UI.Button gameOverRetryButton;
         [SerializeField] private UnityEngine.UI.Button gameOverExitButton;
+        [SerializeField] private TMPro.TMP_Text gameOverTitleText;
 
-        [Header("Vitória")]
+        [Header("Vitória e Ranking")]
         [SerializeField] private GameObject victoryPopup;
         [SerializeField] private UnityEngine.UI.Button victoryNextLevelButton;
+        [SerializeField] private TMPro.TMP_Text victoryRankingText;
         [Tooltip("Nome da próxima cena a carregar ao vencer. Se vazio ou indisponível, avança no Build Settings ou volta ao menu.")]
         [SerializeField] private string nextLevelSceneName = "";
 
         [Header("Configuração Inicial")]
         [Min(1)]
         [SerializeField] private int startingLives = 20;
+        [Min(30f)]
+        [SerializeField] private float defaultMatchTimeLimitSeconds = 300f;
 
         [Header("Dificuldade")]
         [Tooltip("Perfil padrão usado quando a cena inicia sem seleção prévia no menu.")]
@@ -73,6 +79,11 @@ namespace HollowKeep.UI
         private readonly HashSet<Enemy> _trackedEnemies = new();
         private int _currentGold;
         private int _currentLives;
+        private float _matchTimeLimitSeconds;
+        private float _remainingMatchSeconds;
+        private float _elapsedMatchSeconds;
+        private int _lastReportedMatchSecond = -1;
+        private bool _isTimeoutDefeat;
         private bool _isPaused;
         private bool _isGameOver;
         private bool _isVictory;
@@ -82,6 +93,10 @@ namespace HollowKeep.UI
         private bool _allWavesCompleted;
 
         public int CurrentGold => _currentGold;
+        public float MatchTimeLimitSeconds => _matchTimeLimitSeconds;
+        public float RemainingMatchSeconds => _remainingMatchSeconds;
+        public float ElapsedMatchSeconds => _elapsedMatchSeconds;
+        public bool IsTimeoutDefeat => _isTimeoutDefeat;
         public bool IsPaused => _isPaused;
         public bool IsGameOver => _isGameOver;
         public bool IsVictory => _isVictory;
@@ -160,9 +175,17 @@ namespace HollowKeep.UI
         {
             _isGameOver = false;
             _isVictory = false;
+            _isTimeoutDefeat = false;
             _isFastForward = false;
             _hasStartedFirstWave = false;
             _allWavesCompleted = false;
+            _elapsedMatchSeconds = 0f;
+            _lastReportedMatchSecond = -1;
+
+            EnsureMatchTimerIndicator();
+            EnsureVictoryRankingDisplay();
+            EnsureGameOverTitleReference();
+            RefreshVictoryNextButtonLabel();
 
             if (gameOverPopup != null)
             {
@@ -189,6 +212,7 @@ namespace HollowKeep.UI
             SetPaused(false);
             RefreshSpeedButtonDisplay();
             UpdateWaveDisplay(0, waveSpawner != null ? waveSpawner.TotalWaves : 0);
+            RefreshMatchTimerVisibility();
 
             if (waveSpawner != null && waveSpawner.IsInIntermission)
             {
@@ -201,18 +225,56 @@ namespace HollowKeep.UI
             }
         }
 
+        private void Update()
+        {
+            if (_isGameOver || _isVictory || _isPaused || _isBriefingOpen)
+            {
+                return;
+            }
+
+            if (_matchTimeLimitSeconds <= 0f)
+            {
+                return;
+            }
+
+            _elapsedMatchSeconds += Time.deltaTime;
+            _remainingMatchSeconds = Mathf.Max(0f, _matchTimeLimitSeconds - _elapsedMatchSeconds);
+
+            int currentSecond = Mathf.CeilToInt(_remainingMatchSeconds);
+            if (currentSecond != _lastReportedMatchSecond)
+            {
+                _lastReportedMatchSecond = currentSecond;
+                RefreshMatchTimerDisplay();
+            }
+
+            if (_remainingMatchSeconds <= 0f)
+            {
+                TriggerGameOver(isTimeout: true);
+            }
+        }
+
         /// <summary>
-        /// Recarrega ouro inicial e vidas do castelo com base na dificuldade ativa da sessão.
+        /// Recarrega ouro inicial, vidas do castelo e tempo máximo com base na dificuldade ativa da sessão.
         /// </summary>
         public void ApplySessionDifficulty()
         {
             DifficultyProfile difficulty = ActiveDifficulty;
-            int baseGold = (waveSpawner != null && waveSpawner.CurrentLevelData != null)
-                ? waveSpawner.CurrentLevelData.StartingGold
-                : 0;
+            LevelData levelData = waveSpawner != null ? waveSpawner.CurrentLevelData : null;
+            int baseGold = levelData != null ? levelData.StartingGold : 0;
+            float baseTimeLimit = levelData != null ? levelData.MatchTimeLimitSeconds : defaultMatchTimeLimitSeconds;
+
             _currentGold = difficulty != null ? difficulty.GetStartingGold(baseGold) : baseGold;
             _currentLives = difficulty != null ? difficulty.StartingLives : startingLives;
+            _matchTimeLimitSeconds = difficulty != null
+                ? difficulty.GetScaledMatchTimeLimit(baseTimeLimit)
+                : Mathf.Max(30f, baseTimeLimit);
+            _elapsedMatchSeconds = 0f;
+            _remainingMatchSeconds = _matchTimeLimitSeconds;
+            _lastReportedMatchSecond = -1;
+
             RefreshResourceDisplays();
+            RefreshMatchTimerDisplay();
+            RefreshMatchTimerVisibility();
             OnGoldChanged?.Invoke(_currentGold);
         }
 
@@ -222,6 +284,7 @@ namespace HollowKeep.UI
         public void SetBriefingActive(bool active)
         {
             _isBriefingOpen = active;
+            RefreshMatchTimerVisibility();
 
             if (active)
             {
@@ -387,6 +450,7 @@ namespace HollowKeep.UI
             _hasStartedFirstWave = true;
             UpdateWaveDisplay(waveIndex + 1, totalWaves);
             SetAdvanceWaveState(false, "--");
+            GameAudioManager.PlayWaveStart();
         }
 
         private void HandleIntermissionTick(float secondsRemaining)
@@ -483,6 +547,7 @@ namespace HollowKeep.UI
             {
                 _currentLives = Mathf.Max(0, _currentLives - enemy.DamageToCastle);
                 RefreshResourceDisplays();
+                GameAudioManager.PlayCastleHit();
 
                 if (_currentLives <= 0 && !_isGameOver)
                 {
@@ -614,7 +679,7 @@ namespace HollowKeep.UI
             }
         }
 
-        private void TriggerGameOver()
+        private void TriggerGameOver(bool isTimeout = false)
         {
             if (_isGameOver || _isVictory)
             {
@@ -622,6 +687,7 @@ namespace HollowKeep.UI
             }
 
             _isGameOver = true;
+            _isTimeoutDefeat = isTimeout;
             _isPaused = false;
 
             if (pausePopup != null)
@@ -644,7 +710,13 @@ namespace HollowKeep.UI
                 advanceWaveButton.interactable = false;
             }
 
+            if (gameOverTitleText != null)
+            {
+                gameOverTitleText.text = isTimeout ? "TEMPO ESGOTADO" : "DERROTA";
+            }
+
             waveSpawner?.StopSpawning();
+            GameAudioManager.PlayDefeat();
             ApplyActiveTimeScale();
 
             if (gameOverPopup != null)
@@ -683,12 +755,250 @@ namespace HollowKeep.UI
                 advanceWaveButton.interactable = false;
             }
 
+            RecordAndDisplayVictoryRanking();
+            RefreshVictoryNextButtonLabel();
+            GameAudioManager.PlayVictory();
             ApplyActiveTimeScale();
 
             if (victoryPopup != null)
             {
                 victoryPopup.SetActive(true);
             }
+        }
+
+        private void RecordAndDisplayVictoryRanking()
+        {
+            LevelData levelData = waveSpawner != null ? waveSpawner.CurrentLevelData : null;
+            string levelId = levelData != null && !string.IsNullOrWhiteSpace(levelData.LevelId)
+                ? levelData.LevelId
+                : SceneManager.GetActiveScene().name;
+            string stageTitle = levelData != null && !string.IsNullOrWhiteSpace(levelData.StageTitle)
+                ? levelData.StageTitle
+                : levelId;
+            DifficultyProfile difficulty = ActiveDifficulty;
+            string difficultyName = difficulty != null && !string.IsNullOrWhiteSpace(difficulty.DisplayName)
+                ? difficulty.DisplayName
+                : "Normal";
+
+            int rankPosition = MatchRankingService.RecordVictory(
+                levelId,
+                _elapsedMatchSeconds,
+                difficultyName,
+                _currentLives
+            );
+
+            EnsureVictoryRankingDisplay();
+            if (victoryRankingText != null)
+            {
+                victoryRankingText.text = MatchRankingService.FormatVictorySummary(
+                    levelId,
+                    stageTitle,
+                    _elapsedMatchSeconds,
+                    rankPosition,
+                    3
+                );
+            }
+        }
+
+        private bool HasNextLevelConfigured()
+        {
+            if (!string.IsNullOrWhiteSpace(nextLevelSceneName) && Application.CanStreamedLevelBeLoaded(nextLevelSceneName))
+            {
+                return true;
+            }
+
+            int nextBuildIndex = SceneManager.GetActiveScene().buildIndex + 1;
+            return nextBuildIndex > 0 && nextBuildIndex < SceneManager.sceneCountInBuildSettings;
+        }
+
+        private void RefreshVictoryNextButtonLabel()
+        {
+            if (victoryNextLevelButton == null)
+            {
+                return;
+            }
+
+            TMPro.TMP_Text buttonLabel = victoryNextLevelButton.GetComponentInChildren<TMPro.TMP_Text>(true);
+            if (buttonLabel != null)
+            {
+                buttonLabel.text = HasNextLevelConfigured() ? "PRÓXIMA FASE" : "MENU PRINCIPAL";
+            }
+        }
+
+        private void EnsureMatchTimerIndicator()
+        {
+            if (matchTimerText != null)
+            {
+                return;
+            }
+
+            Transform canvasRoot = transform;
+            if (waveText != null && waveText.canvas != null)
+            {
+                canvasRoot = waveText.canvas.transform;
+            }
+
+            GameObject timerObj = new("MatchTimerTopCenter", typeof(RectTransform), typeof(CanvasRenderer), typeof(TMPro.TextMeshProUGUI));
+            timerObj.transform.SetParent(canvasRoot, false);
+
+            // Mantém atrás dos popups (briefing, pausa, vitória, derrota)
+            if (canvasRoot.childCount > 1)
+            {
+                timerObj.transform.SetSiblingIndex(1);
+            }
+
+            RectTransform rect = timerObj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -18f);
+            rect.sizeDelta = new Vector2(380f, 76f);
+
+            TMPro.TextMeshProUGUI tmp = timerObj.GetComponent<TMPro.TextMeshProUGUI>();
+            TMPro.TMP_FontAsset cartographyFont = waveText != null
+                ? waveText.font
+                : (advanceWaveLabelText != null ? advanceWaveLabelText.font : null);
+
+            if (cartographyFont != null)
+            {
+                tmp.font = cartographyFont;
+                Material baseMat = (waveText != null && waveText.fontSharedMaterial != null)
+                    ? waveText.fontSharedMaterial
+                    : cartographyFont.material;
+
+                if (baseMat != null)
+                {
+                    Material matInstance = new(baseMat);
+                    if (matInstance.HasProperty(TMPro.ShaderUtilities.ID_FaceDilate))
+                    {
+                        matInstance.SetFloat(TMPro.ShaderUtilities.ID_FaceDilate, 0.28f);
+                    }
+                    if (matInstance.HasProperty(TMPro.ShaderUtilities.ID_OutlineWidth))
+                    {
+                        matInstance.SetFloat(TMPro.ShaderUtilities.ID_OutlineWidth, 0.26f);
+                    }
+                    if (matInstance.HasProperty(TMPro.ShaderUtilities.ID_OutlineColor))
+                    {
+                        matInstance.SetColor(TMPro.ShaderUtilities.ID_OutlineColor, new Color(0.05f, 0.03f, 0.02f, 0.98f));
+                    }
+                    tmp.fontMaterial = matInstance;
+                }
+            }
+
+            tmp.fontStyle = TMPro.FontStyles.Bold;
+            tmp.fontSize = 50f;
+            tmp.characterSpacing = 4f;
+            tmp.color = Color.white;
+            tmp.alignment = TMPro.TextAlignmentOptions.Center;
+            tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+            tmp.raycastTarget = false;
+
+            UnityEngine.UI.Outline uiOutline = timerObj.AddComponent<UnityEngine.UI.Outline>();
+            uiOutline.effectColor = new Color(0.06f, 0.03f, 0.02f, 0.95f);
+            uiOutline.effectDistance = new Vector2(1.5f, -1.5f);
+
+            UnityEngine.UI.Shadow shadow = timerObj.AddComponent<UnityEngine.UI.Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.85f);
+            shadow.effectDistance = new Vector2(2.5f, -2.5f);
+
+            matchTimerText = tmp;
+            RefreshMatchTimerVisibility();
+        }
+
+        private void RefreshMatchTimerVisibility()
+        {
+            if (matchTimerText != null)
+            {
+                matchTimerText.gameObject.SetActive(!_isBriefingOpen);
+            }
+        }
+
+        private void EnsureVictoryRankingDisplay()
+        {
+            if (victoryRankingText != null || victoryPopup == null)
+            {
+                return;
+            }
+
+            Transform victoryCard = victoryPopup.transform.Find("VictoryCard");
+            if (victoryCard == null)
+            {
+                return;
+            }
+
+            RectTransform cardRect = victoryCard.GetComponent<RectTransform>();
+            if (cardRect != null)
+            {
+                cardRect.sizeDelta = new Vector2(540f, 430f);
+            }
+
+            Transform titleTransform = victoryCard.Find("VictoryTitle");
+            if (titleTransform != null && titleTransform.TryGetComponent(out RectTransform titleRect))
+            {
+                titleRect.anchoredPosition = new Vector2(0f, 152f);
+            }
+
+            if (victoryNextLevelButton != null && victoryNextLevelButton.TryGetComponent(out RectTransform btnRect))
+            {
+                btnRect.anchoredPosition = new Vector2(0f, -148f);
+            }
+
+            GameObject rankingObj = new("VictoryRankingText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TMPro.TextMeshProUGUI));
+            rankingObj.transform.SetParent(victoryCard, false);
+
+            RectTransform rankingRect = rankingObj.GetComponent<RectTransform>();
+            rankingRect.anchorMin = new Vector2(0.5f, 0.5f);
+            rankingRect.anchorMax = new Vector2(0.5f, 0.5f);
+            rankingRect.pivot = new Vector2(0.5f, 0.5f);
+            rankingRect.anchoredPosition = new Vector2(0f, 6f);
+            rankingRect.sizeDelta = new Vector2(470f, 210f);
+
+            TMPro.TextMeshProUGUI tmp = rankingObj.GetComponent<TMPro.TextMeshProUGUI>();
+            TMPro.TMP_Text templateText = advanceWaveLabelText != null
+                ? advanceWaveLabelText
+                : (titleTransform != null ? titleTransform.GetComponent<TMPro.TMP_Text>() : waveText);
+
+            if (templateText != null)
+            {
+                tmp.font = templateText.font;
+                tmp.fontSharedMaterial = templateText.fontSharedMaterial;
+            }
+
+            tmp.fontSize = 23f;
+            tmp.color = new Color(0.16f, 0.10f, 0.06f, 1f);
+            tmp.alignment = TMPro.TextAlignmentOptions.Center;
+            tmp.richText = true;
+            tmp.raycastTarget = false;
+            victoryRankingText = tmp;
+        }
+
+        private void EnsureGameOverTitleReference()
+        {
+            if (gameOverTitleText != null || gameOverPopup == null)
+            {
+                return;
+            }
+
+            Transform card = gameOverPopup.transform.Find("GameOverCard");
+            Transform title = card != null ? card.Find("GameOverTitle") : null;
+            if (title != null)
+            {
+                gameOverTitleText = title.GetComponent<TMPro.TMP_Text>();
+            }
+        }
+
+        private void RefreshMatchTimerDisplay()
+        {
+            if (matchTimerText == null)
+            {
+                return;
+            }
+
+            string formatted = MatchRankingService.FormatTime(_remainingMatchSeconds);
+            matchTimerText.text = formatted;
+            matchTimerText.color = _remainingMatchSeconds <= 30f
+                ? new Color(1f, 0.32f, 0.28f, 1f)
+                : Color.white;
         }
 
         private void ApplyActiveTimeScale()
