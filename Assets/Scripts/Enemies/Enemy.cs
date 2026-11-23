@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using HollowKeep.Audio;
 using HollowKeep.Level;
 using HollowKeep.VFX;
 
@@ -90,6 +91,7 @@ namespace HollowKeep.Enemies
         private float _lateralOffset;
         private bool _isInitialized;
         private bool _hasDied;
+        private bool _hasReachedEnd;
 
         protected virtual void OnEnable()
         {
@@ -114,9 +116,24 @@ namespace HollowKeep.Enemies
                 animator = GetComponentInChildren<Animator>();
             }
 
+            EnsureHitCollider();
+
             if (showHealthBar)
             {
                 EnsureHealthBar();
+            }
+        }
+
+        private void EnsureHitCollider()
+        {
+            Collider existing = GetComponentInChildren<Collider>();
+            if (existing == null)
+            {
+                CapsuleCollider capsule = gameObject.AddComponent<CapsuleCollider>();
+                capsule.center = new Vector3(0f, 0.8f, 0f);
+                capsule.radius = 0.42f;
+                capsule.height = 1.6f;
+                capsule.isTrigger = true;
             }
         }
 
@@ -280,6 +297,7 @@ namespace HollowKeep.Enemies
             }
 
             VfxSpawner.Spawn(deathDustVfxPrefab, transform.position, Quaternion.identity);
+            GameAudioManager.PlayEnemyDie();
 
             // Desabilitar o script dispara OnDisable(), removendo de ActiveEnemies e parando o Update.
             enabled = false;
@@ -403,8 +421,25 @@ namespace HollowKeep.Enemies
             }
         }
 
+        private void OnTriggerEnter(Collider other)
+        {
+            if (!_isInitialized || IsDead || _hasReachedEnd || other == null) return;
+
+            Waypoint wp = other.GetComponent<Waypoint>();
+            if (wp != null && wp.IsBaseGoalTrigger && _waypoints != null && _waypoints.Count > 0 && wp == _waypoints[^1])
+            {
+                if (_currentWaypointIndex >= _waypoints.Count - 1)
+                {
+                    ReachEnd();
+                }
+            }
+        }
+
         protected virtual void ReachEnd()
         {
+            if (_hasReachedEnd || _hasDied) return;
+            _hasReachedEnd = true;
+
             OnReachedEnd?.Invoke(this);
             Destroy(gameObject);
         }

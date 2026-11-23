@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using HollowKeep.Audio;
 using HollowKeep.Enemies;
 using HollowKeep.VFX;
 
@@ -21,6 +23,33 @@ namespace HollowKeep.Projectiles
         private float _splashRadius;
         private float _elapsed;
         private bool _isLaunched;
+        private bool _hasExploded;
+
+        private void Awake()
+        {
+            EnsurePhysicsComponents();
+        }
+
+        private void EnsurePhysicsComponents()
+        {
+            if (!TryGetComponent(out Collider col))
+            {
+                SphereCollider sphere = gameObject.AddComponent<SphereCollider>();
+                sphere.radius = 0.3f;
+                sphere.isTrigger = true;
+            }
+            else
+            {
+                col.isTrigger = true;
+            }
+
+            if (!TryGetComponent(out Rigidbody rb))
+            {
+                rb = gameObject.AddComponent<Rigidbody>();
+            }
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
 
         public void Launch(Vector3 targetPosition, int damage, float splashRadius)
         {
@@ -30,13 +59,14 @@ namespace HollowKeep.Projectiles
             _splashRadius = Mathf.Max(0.1f, splashRadius);
             _elapsed = 0f;
             _isLaunched = true;
+            _hasExploded = false;
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (!_isLaunched) return;
+            if (!_isLaunched || _hasExploded) return;
 
             _elapsed += Time.deltaTime;
             float duration = Mathf.Max(0.05f, flightDuration);
@@ -62,21 +92,39 @@ namespace HollowKeep.Projectiles
 
         private void Explode()
         {
+            if (_hasExploded) return;
+            _hasExploded = true;
+
             VfxSpawner.Spawn(explosionVfxPrefab, _targetPosition, Quaternion.identity);
+            GameAudioManager.PlayCannonExplode();
             DetachAndStopTrail();
 
-            // Percorre de trás para frente porque TakeDamage pode destruir o inimigo e removê-lo da lista.
+            HashSet<Enemy> damagedEnemies = new();
+
+            // Detecção de colisão física via Physics.OverlapSphere nos Colliders dos inimigos
+            Collider[] hitColliders = Physics.OverlapSphere(_targetPosition, _splashRadius);
+            for (int i = 0; i < hitColliders.Length; i++)
+            {
+                Enemy hitEnemy = hitColliders[i] != null ? hitColliders[i].GetComponentInParent<Enemy>() : null;
+                if (hitEnemy != null && !hitEnemy.IsDead && damagedEnemies.Add(hitEnemy))
+                {
+                    hitEnemy.TakeDamage(Damage);
+                }
+            }
+
+            // Fallback por distância no plano XZ para garantir consistência
             var enemies = Enemy.ActiveEnemies;
             for (int i = enemies.Count - 1; i >= 0; i--)
             {
                 Enemy enemy = enemies[i];
-                if (enemy == null || enemy.IsDead) continue;
+                if (enemy == null || enemy.IsDead || damagedEnemies.Contains(enemy)) continue;
 
                 Vector3 diff = enemy.transform.position - _targetPosition;
                 diff.y = 0f;
 
                 if (diff.magnitude <= _splashRadius)
                 {
+                    damagedEnemies.Add(enemy);
                     enemy.TakeDamage(Damage);
                 }
             }

@@ -19,6 +19,11 @@ namespace HollowKeep.Level
         public Waypoint StartWaypoint => (waypoints != null && waypoints.Length > 0) ? waypoints[0] : null;
         public Waypoint EndWaypoint => (waypoints != null && waypoints.Length > 0) ? waypoints[^1] : null;
 
+        private void Awake()
+        {
+            EndWaypoint?.ConfigureAsBaseGoalTrigger();
+        }
+
         /// <summary>
         /// Calcula o vetor unitário lateral no plano XZ perpendicular à tangente da rota no índice informado.
         /// </summary>

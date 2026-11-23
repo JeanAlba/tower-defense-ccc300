@@ -1,4 +1,5 @@
 using UnityEngine;
+using HollowKeep.Audio;
 using HollowKeep.Enemies;
 using HollowKeep.VFX;
 
@@ -17,6 +18,34 @@ namespace HollowKeep.Projectiles
         private Enemy _target;
         private Vector3 _lastTargetPosition;
         private bool _isLaunched;
+        private bool _hasHit;
+
+        private void Awake()
+        {
+            EnsurePhysicsComponents();
+        }
+
+        private void EnsurePhysicsComponents()
+        {
+            if (!TryGetComponent(out Collider col))
+            {
+                SphereCollider sphere = gameObject.AddComponent<SphereCollider>();
+                sphere.radius = Mathf.Max(0.2f, hitDistance);
+                sphere.isTrigger = true;
+            }
+            else
+            {
+                col.isTrigger = true;
+            }
+
+            if (!TryGetComponent(out Rigidbody rb))
+            {
+                rb = gameObject.AddComponent<Rigidbody>();
+            }
+            rb.isKinematic = true;
+            rb.useGravity = false;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        }
 
         public void Launch(Enemy target, int damage)
         {
@@ -24,13 +53,14 @@ namespace HollowKeep.Projectiles
             _target = target;
             _lastTargetPosition = GetTargetAimPoint(target);
             _isLaunched = true;
+            _hasHit = false;
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (!_isLaunched) return;
+            if (!_isLaunched || _hasHit) return;
 
             if (_target != null && !_target.IsDead)
             {
@@ -42,7 +72,7 @@ namespace HollowKeep.Projectiles
 
             if (toTarget.magnitude <= Mathf.Max(hitDistance, distanceThisFrame))
             {
-                OnHit();
+                OnHit(_target);
                 return;
             }
 
@@ -55,15 +85,33 @@ namespace HollowKeep.Projectiles
             }
         }
 
-        private void OnHit()
+        private void OnTriggerEnter(Collider other)
         {
-            if (_target != null && !_target.IsDead)
+            if (!_isLaunched || _hasHit || other == null) return;
+
+            Enemy hitEnemy = other.GetComponentInParent<Enemy>();
+            if (hitEnemy == null || hitEnemy.IsDead) return;
+
+            if (_target == null || _target.IsDead || hitEnemy == _target)
             {
-                _target.TakeDamage(Damage);
+                OnHit(hitEnemy);
+            }
+        }
+
+        private void OnHit(Enemy hitEnemy)
+        {
+            if (_hasHit) return;
+            _hasHit = true;
+
+            Enemy victim = (hitEnemy != null && !hitEnemy.IsDead) ? hitEnemy : _target;
+            if (victim != null && !victim.IsDead)
+            {
+                victim.TakeDamage(Damage);
                 Quaternion hitRotation = transform.forward.sqrMagnitude > 0.001f
                     ? Quaternion.LookRotation(-transform.forward)
                     : Quaternion.identity;
                 VfxSpawner.Spawn(hitVfxPrefab, transform.position, hitRotation);
+                GameAudioManager.PlayArrowHit();
             }
 
             Destroy(gameObject);

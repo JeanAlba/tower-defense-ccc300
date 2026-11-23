@@ -15,6 +15,21 @@ namespace HollowKeep.Level
 
         public Vector3 Position => transform.position;
         public float SpreadRadius => spreadRadius;
+        public bool IsBaseGoalTrigger { get; private set; }
+
+        /// <summary>
+        /// Configura um SphereCollider de gatilho neste waypoint final para detectar a chegada física do inimigo à base.
+        /// </summary>
+        public void ConfigureAsBaseGoalTrigger()
+        {
+            IsBaseGoalTrigger = true;
+            if (!TryGetComponent(out SphereCollider trigger))
+            {
+                trigger = gameObject.AddComponent<SphereCollider>();
+            }
+            trigger.isTrigger = true;
+            trigger.radius = Mathf.Max(0.45f, spreadRadius + 0.25f);
+        }
 
         private void OnDrawGizmos()
         {
