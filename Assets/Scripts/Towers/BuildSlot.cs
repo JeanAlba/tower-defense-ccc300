@@ -1,4 +1,5 @@
 using UnityEngine;
+using HollowKeep.VFX;
 
 namespace HollowKeep.Towers
 {
@@ -11,6 +12,10 @@ namespace HollowKeep.Towers
 
         [Tooltip("Visual exibido enquanto o slot está vazio (opcional).")]
         [SerializeField] private GameObject emptyVisual;
+
+        [Header("Efeitos Visuais")]
+        [SerializeField] private ParticleSystem buildDustVfxPrefab;
+        [SerializeField] private ParticleSystem upgradeVfxPrefab;
 
         private Tower _builtTower;
 
@@ -33,6 +38,7 @@ namespace HollowKeep.Towers
 
             Vector3 spawnPosition = buildPoint != null ? buildPoint.position : transform.position;
             _builtTower = Instantiate(towerPrefab, spawnPosition, Quaternion.identity, transform);
+            VfxSpawner.Spawn(buildDustVfxPrefab, spawnPosition, Quaternion.identity);
 
             if (emptyVisual != null)
             {
@@ -40,6 +46,40 @@ namespace HollowKeep.Towers
             }
 
             return _builtTower;
+        }
+
+        public bool TryUpgradeTower()
+        {
+            if (!IsOccupied || !_builtTower.TryUpgrade())
+            {
+                return false;
+            }
+
+            Vector3 spawnPosition = buildPoint != null ? buildPoint.position : transform.position;
+            VfxSpawner.Spawn(upgradeVfxPrefab, spawnPosition, Quaternion.identity);
+            return true;
+        }
+
+        public int DemolishTower()
+        {
+            if (!IsOccupied)
+            {
+                return 0;
+            }
+
+            int refund = _builtTower.SellRefund;
+            Vector3 spawnPosition = buildPoint != null ? buildPoint.position : transform.position;
+            VfxSpawner.Spawn(buildDustVfxPrefab, spawnPosition, Quaternion.identity);
+
+            Destroy(_builtTower.gameObject);
+            _builtTower = null;
+
+            if (emptyVisual != null)
+            {
+                emptyVisual.SetActive(true);
+            }
+
+            return refund;
         }
 
         private void OnDrawGizmos()

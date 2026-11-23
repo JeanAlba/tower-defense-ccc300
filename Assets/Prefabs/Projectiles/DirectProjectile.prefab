@@ -49,6 +49,7 @@ MonoBehaviour:
   speed: 18
   hitDistance: 0.25
   targetHeightOffset: 0.5
+  hitVfxPrefab: {fileID: 4325492086095772349, guid: eba6d6daf4fdb1e60a67140bc575d7dd, type: 3}
 --- !u!1001 &153894906210693442
 PrefabInstance:
   m_ObjectHideFlags: 0

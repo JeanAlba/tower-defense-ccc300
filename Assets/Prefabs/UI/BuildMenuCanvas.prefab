@@ -130,6 +130,10 @@ MonoBehaviour:
   - towerPrefab: {fileID: 1487540834736200179, guid: 18958477f48b277a791a321788f5b827, type: 3}
     displayName: "Canh\xE3o"
     icon: {fileID: 21300000, guid: 5c639101f050c99aab09922068dbfa91, type: 3}
+  upgradeIcon: {fileID: 21300000, guid: b909f78cde3f157119b73e38af5f6ce0, type: 3}
+  demolishIcon: {fileID: 21300000, guid: 40b9c34b2fa305d5d9ab7e2654c9f7db, type: 3}
+  demolishIconColor: {r: 0.62, g: 0.14, b: 0.12, a: 1}
+  demolishRefundColor: {r: 0.14, g: 0.45, b: 0.18, a: 1}
   directTowerPrefab: {fileID: 418275737917366109, guid: 204a74960430f2147ac394ab903d09e5, type: 3}
   parabolicTowerPrefab: {fileID: 1487540834736200179, guid: 18958477f48b277a791a321788f5b827, type: 3}
   targetCamera: {fileID: 0}

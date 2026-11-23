@@ -1,13 +1,20 @@
 using UnityEngine;
 using HollowKeep.Enemies;
+using HollowKeep.VFX;
 
 namespace HollowKeep.Projectiles
 {
     public class ParabolicProjectile : Projectile
     {
         [Header("Trajetória Parabólica")]
-        [SerializeField] private float flightDuration = 0.9f;
-        [SerializeField] private float arcHeight = 3.5f;
+        [SerializeField] private float flightDuration = 0.6f;
+        [SerializeField] private float arcHeight = 2.8f;
+
+        [Header("Efeitos Visuais")]
+        [SerializeField] private ParticleSystem explosionVfxPrefab;
+        [SerializeField] private ParticleSystem trailVfx;
+
+        public float FlightDuration => Mathf.Max(0.05f, flightDuration);
 
         private Vector3 _startPosition;
         private Vector3 _targetPosition;
@@ -55,6 +62,9 @@ namespace HollowKeep.Projectiles
 
         private void Explode()
         {
+            VfxSpawner.Spawn(explosionVfxPrefab, _targetPosition, Quaternion.identity);
+            DetachAndStopTrail();
+
             // Percorre de trás para frente porque TakeDamage pode destruir o inimigo e removê-lo da lista.
             var enemies = Enemy.ActiveEnemies;
             for (int i = enemies.Count - 1; i >= 0; i--)
@@ -72,6 +82,15 @@ namespace HollowKeep.Projectiles
             }
 
             Destroy(gameObject);
+        }
+
+        private void DetachAndStopTrail()
+        {
+            if (trailVfx == null) return;
+
+            trailVfx.transform.SetParent(null, true);
+            trailVfx.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            Destroy(trailVfx.gameObject, 1.5f);
         }
 
         private void OnDrawGizmosSelected()

@@ -54,8 +54,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.1, y: 0.2, z: 1.1}
-  m_Center: {x: 0, y: 0.1, z: 0}
+  m_Size: {x: 1.25, y: 0.35, z: 1.25}
+  m_Center: {x: 0, y: 0.175, z: 0}
 --- !u!114 &1758072493512739672
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -70,6 +70,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Towers.BuildSlot
   buildPoint: {fileID: 1351118789013565809}
   emptyVisual: {fileID: 8203428834425030241}
+  buildDustVfxPrefab: {fileID: 5653262307153140496, guid: 9969fffe4daf93a2aaf650bd6201d96d, type: 3}
+  upgradeVfxPrefab: {fileID: 6924285081292591441, guid: a2eb2ce3a33cda1c0b87d4dab38c70fd, type: 3}
 --- !u!1 &6759213559538781851
 GameObject:
   m_ObjectHideFlags: 0

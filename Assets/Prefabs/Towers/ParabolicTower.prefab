@@ -49,14 +49,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Towers.ParabolicTower
   towerName: "Torre Canh\xE3o"
   buildCost: 80
-  range: 5
+  upgradeCost: 0
+  upgradeDamageMultiplier: 1.45
+  upgradeFireRateMultiplier: 1.2
+  upgradeRangeBonus: 0.75
+  sellRefundRatio: 0.7
+  upgradedScaleMultiplier: 1.12
+  range: 4.5
   fireRate: 0.6
   damage: 35
   turretHead: {fileID: 8081613907518901145}
   firePoint: {fileID: 1890364428490910140}
   rotationSpeed: 10
   projectilePrefab: {fileID: 2613371395237552125, guid: 71b3c6097dc1b9f14a263b9d90639d0a, type: 3}
-  splashRadius: 2.5
+  splashRadius: 2.1
+  leadFactor: 1
+  muzzleVfxPrefab: {fileID: 5921426650046588556, guid: 2d73334d7d3c920ed8ea99d64ec79650, type: 3}
 --- !u!1 &3015359923277117232
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,5 +1,6 @@
 using UnityEngine;
 using HollowKeep.Enemies;
+using HollowKeep.VFX;
 
 namespace HollowKeep.Projectiles
 {
@@ -9,6 +10,9 @@ namespace HollowKeep.Projectiles
         [SerializeField] private float speed = 18f;
         [SerializeField] private float hitDistance = 0.25f;
         [SerializeField] private float targetHeightOffset = 0.5f;
+
+        [Header("Efeitos Visuais")]
+        [SerializeField] private ParticleSystem hitVfxPrefab;
 
         private Enemy _target;
         private Vector3 _lastTargetPosition;
@@ -56,6 +60,10 @@ namespace HollowKeep.Projectiles
             if (_target != null && !_target.IsDead)
             {
                 _target.TakeDamage(Damage);
+                Quaternion hitRotation = transform.forward.sqrMagnitude > 0.001f
+                    ? Quaternion.LookRotation(-transform.forward)
+                    : Quaternion.identity;
+                VfxSpawner.Spawn(hitVfxPrefab, transform.position, hitRotation);
             }
 
             Destroy(gameObject);

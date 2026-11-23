@@ -33,6 +33,12 @@ namespace HollowKeep.UI
         [Header("Opções Modulares de Torres")]
         [SerializeField] private List<TowerBuildOption> towerOptions = new();
 
+        [Header("Gerenciamento da Torre (Evoluir / Demolir)")]
+        [SerializeField] private Sprite upgradeIcon;
+        [SerializeField] private Sprite demolishIcon;
+        [SerializeField] private Color demolishIconColor = new Color(0.62f, 0.14f, 0.12f, 1f);
+        [SerializeField] private Color demolishRefundColor = new Color(0.14f, 0.45f, 0.18f, 1f);
+
         [Header("Fallback Legado (Opcional)")]
         [SerializeField] private DirectTower directTowerPrefab;
         [SerializeField] private ParabolicTower parabolicTowerPrefab;
@@ -41,10 +47,14 @@ namespace HollowKeep.UI
         [SerializeField] private Camera targetCamera;
         [SerializeField] private LayerMask slotLayerMask = ~0;
         [SerializeField] private GameHUDController hudController;
+        [SerializeField] private TowerRangeIndicator rangeIndicator;
 
         private readonly List<TowerBuildOptionButton> _spawnedButtons = new();
         private readonly List<Tower> _optionPrefabs = new();
         private BuildSlot _selectedSlot;
+        private bool _isManageMode;
+        private TowerBuildOptionButton _upgradeButton;
+        private TowerBuildOptionButton _demolishButton;
 
         private void Awake()
         {
@@ -57,6 +67,8 @@ namespace HollowKeep.UI
             {
                 hudController = FindFirstObjectByType<GameHUDController>();
             }
+
+            EnsureRangeIndicator();
 
             if (closeButton != null)
             {
@@ -100,6 +112,10 @@ namespace HollowKeep.UI
                 {
                     CloseMenu();
                 }
+                else
+                {
+                    HideRangeIndicator();
+                }
 
                 return;
             }
@@ -118,20 +134,32 @@ namespace HollowKeep.UI
         }
 
         /// <summary>
-        /// Abre o anel radial centralizado no slot selecionado.
+        /// Abre o anel radial centralizado no slot selecionado (construção se vazio, evoluir/demolir se ocupado).
         /// </summary>
         public void OpenMenu(BuildSlot slot, Camera cam = null)
         {
             _selectedSlot = slot;
-            if (menuPanel == null)
+            if (menuPanel == null || slot == null)
             {
                 return;
             }
 
-            menuPanel.gameObject.SetActive(true);
-            RefreshTowerButtons();
+            _isManageMode = slot.IsOccupied && slot.BuiltTower != null;
+            if (_isManageMode)
+            {
+                RebuildManageOptions(slot.BuiltTower);
+                ShowRangeIndicator(slot.BuiltTower.transform.position, slot.BuiltTower.Range);
+            }
+            else
+            {
+                RebuildBuildOptions();
+                HideRangeIndicator();
+            }
 
-            if (positionMenuAtSlot && slot != null)
+            menuPanel.gameObject.SetActive(true);
+            RefreshActiveButtons();
+
+            if (positionMenuAtSlot)
             {
                 Camera activeCam = cam != null ? cam : (targetCamera != null ? targetCamera : Camera.main);
                 if (activeCam != null)
@@ -145,15 +173,18 @@ namespace HollowKeep.UI
         }
 
         /// <summary>
-        /// Fecha o anel radial de construção e limpa a seleção.
+        /// Fecha o anel radial e limpa a seleção.
         /// </summary>
         public void CloseMenu()
         {
             _selectedSlot = null;
+            _isManageMode = false;
             if (menuPanel != null)
             {
                 menuPanel.gameObject.SetActive(false);
             }
+
+            HideRangeIndicator();
         }
 
         private void EnsureFallbackOptions()
@@ -184,6 +215,11 @@ namespace HollowKeep.UI
 
         private void RebuildRadialOptions()
         {
+            RebuildBuildOptions();
+        }
+
+        private void ClearSpawnedButtons()
+        {
             for (int i = 0; i < _spawnedButtons.Count; i++)
             {
                 if (_spawnedButtons[i] != null)
@@ -193,6 +229,13 @@ namespace HollowKeep.UI
             }
             _spawnedButtons.Clear();
             _optionPrefabs.Clear();
+            _upgradeButton = null;
+            _demolishButton = null;
+        }
+
+        private void RebuildBuildOptions()
+        {
+            ClearSpawnedButtons();
 
             if (optionButtonTemplate == null || menuPanel == null)
             {
@@ -214,21 +257,71 @@ namespace HollowKeep.UI
             for (int i = 0; i < count; i++)
             {
                 TowerBuildOption option = validOptions[i];
-                TowerBuildOptionButton instance = Instantiate(optionButtonTemplate, menuPanel);
-                instance.name = $"Option_{option.towerPrefab.name}";
-                instance.gameObject.SetActive(true);
-                instance.Configure(option.towerPrefab, option.displayName, option.icon, TryBuild);
-
-                RectTransform rect = instance.GetComponent<RectTransform>();
-                if (rect != null)
-                {
-                    rect.anchoredPosition = GetRadialPosition(i, count);
-                }
+                TowerBuildOptionButton instance = InstantiateOptionButton($"Option_{option.towerPrefab.name}", i, count);
+                instance.Configure(option.towerPrefab, option.displayName, option.icon, TryBuild, HandleOptionHoverChanged);
 
                 _spawnedButtons.Add(instance);
                 _optionPrefabs.Add(option.towerPrefab);
             }
 
+            PositionCloseButton();
+        }
+
+        private void RebuildManageOptions(Tower tower)
+        {
+            ClearSpawnedButtons();
+
+            if (optionButtonTemplate == null || menuPanel == null || tower == null)
+            {
+                return;
+            }
+
+            optionButtonTemplate.gameObject.SetActive(false);
+
+            _upgradeButton = InstantiateOptionButton("Option_Upgrade", 0, 2);
+            string upgradeLabel = tower.CanUpgrade ? $"EVOLUIR (NV.{tower.Level + 1})" : "NÍVEL MÁX.";
+            string upgradeCostLabel = tower.CanUpgrade ? tower.UpgradeCost.ToString() : "MÁX";
+            _upgradeButton.ConfigureAction(
+                upgradeLabel,
+                upgradeIcon,
+                upgradeCostLabel,
+                TryUpgradeSelectedTower,
+                HandleUpgradeHoverChanged
+            );
+            _spawnedButtons.Add(_upgradeButton);
+
+            _demolishButton = InstantiateOptionButton("Option_Demolish", 1, 2);
+            _demolishButton.ConfigureAction(
+                "DEMOLIR",
+                demolishIcon,
+                $"+{tower.SellRefund}",
+                DemolishSelectedTower,
+                null,
+                demolishRefundColor,
+                demolishIconColor
+            );
+            _spawnedButtons.Add(_demolishButton);
+
+            PositionCloseButton();
+        }
+
+        private TowerBuildOptionButton InstantiateOptionButton(string objName, int index, int count)
+        {
+            TowerBuildOptionButton instance = Instantiate(optionButtonTemplate, menuPanel);
+            instance.name = objName;
+            instance.gameObject.SetActive(true);
+
+            RectTransform rect = instance.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchoredPosition = GetRadialPosition(index, count);
+            }
+
+            return instance;
+        }
+
+        private void PositionCloseButton()
+        {
             if (closeButton != null)
             {
                 RectTransform closeRect = closeButton.GetComponent<RectTransform>();
@@ -267,7 +360,7 @@ namespace HollowKeep.UI
             if (Physics.Raycast(ray, out RaycastHit hit, 200f, slotLayerMask))
             {
                 BuildSlot slot = hit.collider.GetComponentInParent<BuildSlot>();
-                if (slot != null && !slot.IsOccupied)
+                if (slot != null)
                 {
                     OpenMenu(slot, cam);
                     return;
@@ -304,16 +397,140 @@ namespace HollowKeep.UI
             CloseMenu();
         }
 
-        private void HandleGoldChanged(int _)
+        private void TryUpgradeSelectedTower()
         {
-            RefreshTowerButtons();
+            if (_selectedSlot == null || !_selectedSlot.IsOccupied || _selectedSlot.BuiltTower == null)
+            {
+                return;
+            }
+
+            if (hudController != null && hudController.IsInputBlocked)
+            {
+                return;
+            }
+
+            Tower tower = _selectedSlot.BuiltTower;
+            if (!tower.CanUpgrade)
+            {
+                return;
+            }
+
+            int cost = tower.UpgradeCost;
+            if (hudController != null && !hudController.CanAfford(cost))
+            {
+                return;
+            }
+
+            if (!_selectedSlot.TryUpgradeTower())
+            {
+                return;
+            }
+
+            hudController?.TrySpendGold(cost);
+            CloseMenu();
         }
 
-        private void RefreshTowerButtons()
+        private void DemolishSelectedTower()
         {
+            if (_selectedSlot == null || !_selectedSlot.IsOccupied)
+            {
+                return;
+            }
+
+            if (hudController != null && hudController.IsInputBlocked)
+            {
+                return;
+            }
+
+            int refund = _selectedSlot.DemolishTower();
+            if (refund > 0)
+            {
+                hudController?.AddGold(refund);
+            }
+
+            CloseMenu();
+        }
+
+        private void HandleOptionHoverChanged(Tower towerPrefab, bool isHovering)
+        {
+            if (_isManageMode || _selectedSlot == null || _selectedSlot.IsOccupied)
+            {
+                return;
+            }
+
+            if (isHovering && towerPrefab != null)
+            {
+                ShowRangeIndicator(_selectedSlot.transform.position, towerPrefab.Range);
+            }
+            else if (!isHovering)
+            {
+                HideRangeIndicator();
+            }
+        }
+
+        private void HandleUpgradeHoverChanged(bool isHovering)
+        {
+            if (!_isManageMode || _selectedSlot == null || _selectedSlot.BuiltTower == null)
+            {
+                return;
+            }
+
+            Tower tower = _selectedSlot.BuiltTower;
+            float previewRange = isHovering ? tower.UpgradedRange : tower.Range;
+            ShowRangeIndicator(tower.transform.position, previewRange);
+        }
+
+        private void EnsureRangeIndicator()
+        {
+            if (rangeIndicator != null) return;
+
+            rangeIndicator = FindFirstObjectByType<TowerRangeIndicator>();
+            if (rangeIndicator == null)
+            {
+                GameObject indicatorObj = new GameObject("TowerRangeIndicator");
+                rangeIndicator = indicatorObj.AddComponent<TowerRangeIndicator>();
+            }
+        }
+
+        private void ShowRangeIndicator(Vector3 worldCenter, float range)
+        {
+            EnsureRangeIndicator();
+            rangeIndicator?.Show(worldCenter, range);
+        }
+
+        private void HideRangeIndicator()
+        {
+            rangeIndicator?.Hide();
+        }
+
+        private void HandleGoldChanged(int _)
+        {
+            RefreshActiveButtons();
+        }
+
+        private void RefreshActiveButtons()
+        {
+            if (_isManageMode)
+            {
+                Tower tower = _selectedSlot != null ? _selectedSlot.BuiltTower : null;
+                if (_upgradeButton != null)
+                {
+                    bool canAffordUpgrade = tower != null && tower.CanUpgrade
+                        && (hudController == null || hudController.CanAfford(tower.UpgradeCost));
+                    _upgradeButton.SetAffordable(canAffordUpgrade);
+                }
+
+                if (_demolishButton != null)
+                {
+                    _demolishButton.SetAffordable(tower != null);
+                }
+
+                return;
+            }
+
             for (int i = 0; i < _spawnedButtons.Count; i++)
             {
-                Tower prefab = _optionPrefabs[i];
+                Tower prefab = i < _optionPrefabs.Count ? _optionPrefabs[i] : null;
                 bool canAfford = prefab != null && (hudController == null || hudController.CanAfford(prefab.BuildCost));
                 _spawnedButtons[i].SetAffordable(canAfford);
             }
