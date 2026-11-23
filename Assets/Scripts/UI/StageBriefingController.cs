@@ -1,3 +1,4 @@
+using HollowKeep.Audio;
 using HollowKeep.Level.Data;
 using HollowKeep.Level.Spawning;
 using TMPro;
@@ -193,6 +194,7 @@ namespace HollowKeep.UI
         private void HandleNormalClicked()
         {
             if (normalDifficulty == null) return;
+            GameAudioManager.PlayUiClick();
             _selectedDifficulty = normalDifficulty;
             RefreshDifficultyUI();
         }
@@ -200,6 +202,7 @@ namespace HollowKeep.UI
         private void HandleHardClicked()
         {
             if (hardDifficulty == null) return;
+            GameAudioManager.PlayUiClick();
             _selectedDifficulty = hardDifficulty;
             RefreshDifficultyUI();
         }
@@ -232,14 +235,20 @@ namespace HollowKeep.UI
             int baseGold = (waveSpawner != null && waveSpawner.CurrentLevelData != null)
                 ? waveSpawner.CurrentLevelData.StartingGold
                 : 150;
+            float baseTimeLimit = (waveSpawner != null && waveSpawner.CurrentLevelData != null)
+                ? waveSpawner.CurrentLevelData.MatchTimeLimitSeconds
+                : 300f;
             int startGold = _selectedDifficulty.GetStartingGold(baseGold);
+            float scaledTimeLimit = _selectedDifficulty.GetScaledMatchTimeLimit(baseTimeLimit);
+            string timeFormatted = MatchRankingService.FormatTime(scaledTimeLimit);
             int hpBonusPercent = Mathf.RoundToInt((_selectedDifficulty.EnemyHealthMultiplier - 1f) * 100f);
-            string combatNote = hpBonusPercent > 0 ? $"+{hpBonusPercent}% HP inimigos" : "ritmo padrão";
-            difficultySummaryText.text = $"{_selectedDifficulty.StartingLives} vidas · {startGold} ouro · {combatNote}";
+            string combatNote = hpBonusPercent > 0 ? $"+{hpBonusPercent}% HP" : "ritmo padrão";
+            difficultySummaryText.text = $"{_selectedDifficulty.StartingLives} vidas · {startGold} ouro · máx. {timeFormatted} · {combatNote}";
         }
 
         private void HandleBattleClicked()
         {
+            GameAudioManager.PlayUiClick();
             if (_selectedDifficulty != null)
             {
                 GameSessionConfig.SetDifficulty(_selectedDifficulty);
@@ -257,6 +266,7 @@ namespace HollowKeep.UI
 
         private void HandleCloseClicked()
         {
+            GameAudioManager.PlayUiClick();
             Time.timeScale = 1f;
             if (!string.IsNullOrWhiteSpace(mainMenuSceneName))
             {

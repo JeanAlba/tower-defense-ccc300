@@ -1,4 +1,5 @@
 using UnityEngine;
+using HollowKeep.Audio;
 using HollowKeep.VFX;
 
 namespace HollowKeep.Towers
@@ -39,6 +40,7 @@ namespace HollowKeep.Towers
             Vector3 spawnPosition = buildPoint != null ? buildPoint.position : transform.position;
             _builtTower = Instantiate(towerPrefab, spawnPosition, Quaternion.identity, transform);
             VfxSpawner.Spawn(buildDustVfxPrefab, spawnPosition, Quaternion.identity);
+            GameAudioManager.PlayTowerBuild();
 
             if (emptyVisual != null)
             {
@@ -57,6 +59,7 @@ namespace HollowKeep.Towers
 
             Vector3 spawnPosition = buildPoint != null ? buildPoint.position : transform.position;
             VfxSpawner.Spawn(upgradeVfxPrefab, spawnPosition, Quaternion.identity);
+            GameAudioManager.PlayTowerUpgrade();
             return true;
         }
 
@@ -70,6 +73,7 @@ namespace HollowKeep.Towers
             int refund = _builtTower.SellRefund;
             Vector3 spawnPosition = buildPoint != null ? buildPoint.position : transform.position;
             VfxSpawner.Spawn(buildDustVfxPrefab, spawnPosition, Quaternion.identity);
+            GameAudioManager.PlayTowerDemolish();
 
             Destroy(_builtTower.gameObject);
             _builtTower = null;

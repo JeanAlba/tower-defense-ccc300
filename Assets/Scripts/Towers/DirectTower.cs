@@ -1,4 +1,5 @@
 using UnityEngine;
+using HollowKeep.Audio;
 using HollowKeep.Enemies;
 using HollowKeep.Projectiles;
 
@@ -28,6 +29,7 @@ namespace HollowKeep.Towers
 
             DirectProjectile projectile = Instantiate(projectilePrefab, GetFirePosition(), Quaternion.identity);
             projectile.Launch(target, damage);
+            GameAudioManager.PlayArrowShoot();
         }
     }
 }

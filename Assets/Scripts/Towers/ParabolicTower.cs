@@ -1,4 +1,5 @@
 using UnityEngine;
+using HollowKeep.Audio;
 using HollowKeep.Enemies;
 using HollowKeep.Projectiles;
 using HollowKeep.VFX;
@@ -50,6 +51,7 @@ namespace HollowKeep.Towers
 
             ParabolicProjectile projectile = Instantiate(projectilePrefab, firePosition, Quaternion.identity);
             projectile.Launch(aimPosition, damage, splashRadius);
+            GameAudioManager.PlayCannonShoot();
         }
     }
 }
