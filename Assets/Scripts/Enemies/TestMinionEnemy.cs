@@ -4,9 +4,9 @@ namespace HollowKeep.Enemies
 {
     public class TestMinionEnemy : Enemy
     {
-        public override int MaxHealth => 60;
-        public override float MoveSpeed => 3.5f;
-        public override int GoldReward => 10;
-        public override int DamageToCastle => 1;
+        protected override int DefaultMaxHealth => 60;
+        protected override float DefaultMoveSpeed => 3.5f;
+        protected override int DefaultGoldReward => 10;
+        protected override int DefaultDamageToCastle => 1;
     }
 }

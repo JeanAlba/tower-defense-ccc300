@@ -20,24 +20,53 @@ namespace HollowKeep.Level.Spawning
         [Tooltip("Se verdadeiro, inicia a contagem da primeira onda automaticamente no Start.")]
         [SerializeField] private bool autoStartOnPlay = true;
 
+        [Tooltip("Tempo de preparação (em segundos) antes da primeira onda iniciar automaticamente caso o jogador não clique para iniciar.")]
+        [Min(0f)]
+        [SerializeField] private float initialPreparationDuration = 10f;
+
+        [Tooltip("Porcentagem (0.5 a 1.0) da onda a partir da qual o botão de adiantar próxima onda é liberado (estilo Kingdom Rush).")]
+        [Range(0.5f, 1f)]
+        [SerializeField] private float earlyCallWaveThreshold = 0.8f;
+
+        [Tooltip("Quando todos os inimigos da tela morrem antes da próxima subonda, reduz a espera restante para no máximo este tempo (em segundos).")]
+        [Min(0.1f)]
+        [SerializeField] private float emptyFieldAdvanceLeadSeconds = 0.75f;
+
+        [Header("Dificuldade")]
+        [Tooltip("Perfil padrão usado quando a cena é iniciada diretamente sem seleção prévia no menu.")]
+        [SerializeField] private DifficultyProfile defaultDifficulty;
+
         [Header("Debug")]
         [SerializeField] private int currentWaveIndex = -1;
         [SerializeField] private int aliveEnemiesCount = 0;
         [SerializeField] private bool isWaveActive = false;
 
         public LevelData CurrentLevelData => levelData;
+        public DifficultyProfile ActiveDifficulty => GameSessionConfig.Resolve(defaultDifficulty);
         public int CurrentWaveNumber => currentWaveIndex + 1;
         public int TotalWaves => (levelData != null) ? levelData.TotalWaves : 0;
         public int AliveEnemiesCount => aliveEnemiesCount;
         public bool IsWaveActive => isWaveActive;
+        public bool IsInIntermission => _isInIntermission;
+        public float IntermissionRemainingSeconds => _intermissionRemaining;
 
         public event Action<int, int> OnWaveStarted;          // (waveIndex, totalWaves)
         public event Action<int> OnWaveCompleted;             // (waveIndex)
         public event Action OnAllWavesCompleted;
         public event Action<float> OnIntermissionTick;         // segundos restantes no intervalo
+        public event Action<float, float> OnIntermissionUpdated; // (segundos restantes, duração total)
+        public event Action<Enemy> OnEnemySpawned;
+
+        private sealed class WaveRunState
+        {
+            public int ActiveSpawns;
+        }
 
         private Coroutine _levelRoutine;
-        private readonly List<Coroutine> _activeSpawnCoroutines = new();
+        private bool _isInIntermission;
+        private bool _skipIntermissionRequested;
+        private bool _suppressAutoStart;
+        private float _intermissionRemaining;
 
         private void Awake()
         {
@@ -49,10 +78,18 @@ namespace HollowKeep.Level.Spawning
 
         private void Start()
         {
-            if (autoStartOnPlay && levelData != null)
+            if (autoStartOnPlay && !_suppressAutoStart && levelData != null)
             {
                 StartLevel();
             }
+        }
+
+        /// <summary>
+        /// Impede o início automático das ondas no Start quando há uma tela pré-fase aguardando confirmação.
+        /// </summary>
+        public void SuppressAutoStart()
+        {
+            _suppressAutoStart = true;
         }
 
         public void SetLevelData(LevelData newLevelData)
@@ -86,30 +123,63 @@ namespace HollowKeep.Level.Spawning
             _levelRoutine = StartCoroutine(RunLevelRoutine());
         }
 
+        /// <summary>
+        /// Adianta o início da próxima onda caso um intervalo esteja ativo.
+        /// </summary>
+        public bool SkipIntermission()
+        {
+            if (!_isInIntermission)
+            {
+                return false;
+            }
+
+            _skipIntermissionRequested = true;
+            return true;
+        }
+
+        /// <summary>
+        /// Interrompe imediatamente o fluxo de ondas e rotinas de spawn em andamento.
+        /// </summary>
+        public void StopSpawning()
+        {
+            if (_levelRoutine != null)
+            {
+                StopCoroutine(_levelRoutine);
+                _levelRoutine = null;
+            }
+
+            StopAllCoroutines();
+            _isInIntermission = false;
+            _skipIntermissionRequested = false;
+            _intermissionRemaining = 0f;
+            isWaveActive = false;
+        }
+
         private IEnumerator RunLevelRoutine()
         {
             currentWaveIndex = -1;
+
+            if (levelData.Waves.Count > 0)
+            {
+                yield return StartCoroutine(RunInitialPreparationRoutine(initialPreparationDuration));
+            }
 
             for (int w = 0; w < levelData.Waves.Count; w++)
             {
                 currentWaveIndex = w;
                 WaveData wave = levelData.Waves[w];
+                bool hasNextWave = (w + 1) < levelData.Waves.Count;
 
-                // Intervalo de descanso antes da onda (se configurado)
-                float intermission = (w == 0) ? 3f : levelData.TimeBetweenWaves;
-                while (intermission > 0f)
-                {
-                    OnIntermissionTick?.Invoke(intermission);
-                    yield return new WaitForSeconds(1f);
-                    intermission -= 1f;
-                }
-                OnIntermissionTick?.Invoke(0f);
-
-                // Execução da onda
-                yield return StartCoroutine(ExecuteWaveRoutine(wave, w));
+                yield return StartCoroutine(ExecuteWaveRoutine(wave, w, hasNextWave));
 
                 OnWaveCompleted?.Invoke(w);
                 Debug.Log($"[WaveSpawner] Onda {w + 1}/{levelData.TotalWaves} finalizada!");
+            }
+
+            // Garante que todos os inimigos (inclusive sobrepostos) morreram ou alcançaram o castelo antes da vitória
+            while (aliveEnemiesCount > 0)
+            {
+                yield return new WaitForSeconds(0.25f);
             }
 
             isWaveActive = false;
@@ -117,96 +187,215 @@ namespace HollowKeep.Level.Spawning
             Debug.Log("[WaveSpawner] Todas as ondas do nível foram concluídas com sucesso!");
         }
 
-        private IEnumerator ExecuteWaveRoutine(WaveData wave, int waveIdx)
+        private IEnumerator RunInitialPreparationRoutine(float duration)
+        {
+            float intermission = duration;
+            _isInIntermission = intermission > 0f;
+            _skipIntermissionRequested = false;
+            _intermissionRemaining = Mathf.Max(0f, intermission);
+
+            int lastReportedSecond = -1;
+            while (intermission > 0f && !_skipIntermissionRequested)
+            {
+                _intermissionRemaining = Mathf.Max(0f, intermission);
+                int currentSecond = Mathf.CeilToInt(intermission);
+                if (currentSecond != lastReportedSecond)
+                {
+                    lastReportedSecond = currentSecond;
+                    OnIntermissionTick?.Invoke(currentSecond);
+                }
+
+                OnIntermissionUpdated?.Invoke(_intermissionRemaining, duration);
+                yield return null;
+                intermission -= Time.deltaTime;
+            }
+
+            ClearIntermissionState(duration);
+        }
+
+        private IEnumerator ExecuteWaveRoutine(WaveData wave, int waveIdx, bool hasNextWave)
         {
             isWaveActive = true;
             OnWaveStarted?.Invoke(waveIdx, levelData.TotalWaves);
             Debug.Log($"[WaveSpawner] Iniciando Onda {waveIdx + 1}/{levelData.TotalWaves} (Duração: {wave.Duration}s)");
 
-            _activeSpawnCoroutines.Clear();
+            WaveRunState waveState = new();
             float waveTimer = 0f;
 
             // Ordena subondas por porcentagem
             List<SubWaveData> sortedSubwaves = new(wave.Subwaves);
             sortedSubwaves.Sort((a, b) => a.WavePercentage.CompareTo(b.WavePercentage));
 
-            int nextSubwaveIdx = 0;
+            DifficultyProfile difficulty = ActiveDifficulty;
+            float intermissionDuration = difficulty != null
+                ? difficulty.GetScaledTimeBetweenWaves(levelData.TimeBetweenWaves)
+                : levelData.TimeBetweenWaves;
+            float earlyCallStartTime = wave.Duration * earlyCallWaveThreshold;
 
-            // Linha do tempo da onda
-            while (waveTimer < wave.Duration || nextSubwaveIdx < sortedSubwaves.Count)
+            int nextSubwaveIdx = 0;
+            bool earlyIntermissionStarted = false;
+            float intermissionRemaining = 0f;
+            int lastReportedSecond = -1;
+
+            while (true)
             {
                 float currentPercentage = (wave.Duration > 0f) ? (waveTimer / wave.Duration) * 100f : 100f;
 
                 while (nextSubwaveIdx < sortedSubwaves.Count && sortedSubwaves[nextSubwaveIdx].WavePercentage <= currentPercentage)
                 {
-                    SubWaveData subwave = sortedSubwaves[nextSubwaveIdx];
-                    foreach (SpawnGroup group in subwave.SpawnGroups)
-                    {
-                        Coroutine c = StartCoroutine(SpawnGroupRoutine(group));
-                        _activeSpawnCoroutines.Add(c);
-                    }
+                    LaunchSubwave(sortedSubwaves[nextSubwaveIdx], waveState);
                     nextSubwaveIdx++;
+                }
+
+                bool allSubwavesTriggered = nextSubwaveIdx >= sortedSubwaves.Count;
+                bool waveFieldClear = waveState.ActiveSpawns == 0 && aliveEnemiesCount == 0;
+
+                // Se todos os inimigos morreram antes da próxima subonda, evita tela vazia prolongada
+                if (!allSubwavesTriggered && waveFieldClear)
+                {
+                    float nextTriggerTime = (sortedSubwaves[nextSubwaveIdx].WavePercentage / 100f) * wave.Duration;
+                    float fastForwardTime = nextTriggerTime - emptyFieldAdvanceLeadSeconds;
+                    if (fastForwardTime > waveTimer)
+                    {
+                        waveTimer = fastForwardTime;
+                    }
+                }
+
+                // Estilo Kingdom Rush: libera botão de adiantar onda aos ~80% da duração (ou quando limpar tudo)
+                if (hasNextWave && !earlyIntermissionStarted && (waveTimer >= earlyCallStartTime || (allSubwavesTriggered && waveFieldClear)))
+                {
+                    earlyIntermissionStarted = true;
+                    _skipIntermissionRequested = false;
+                    intermissionRemaining = intermissionDuration;
+                    _intermissionRemaining = Mathf.Max(0f, intermissionRemaining);
+                    _isInIntermission = intermissionDuration > 0f;
+                    lastReportedSecond = -1;
+
+                    if (intermissionDuration <= 0f)
+                    {
+                        LaunchRemainingSubwaves(sortedSubwaves, ref nextSubwaveIdx, waveState);
+                        ClearIntermissionState(intermissionDuration);
+                        break;
+                    }
+                }
+
+                if (earlyIntermissionStarted)
+                {
+                    if (_skipIntermissionRequested || intermissionRemaining <= 0f)
+                    {
+                        LaunchRemainingSubwaves(sortedSubwaves, ref nextSubwaveIdx, waveState);
+                        ClearIntermissionState(intermissionDuration);
+                        break;
+                    }
+
+                    _intermissionRemaining = Mathf.Max(0f, intermissionRemaining);
+                    int currentSecond = Mathf.CeilToInt(intermissionRemaining);
+                    if (currentSecond != lastReportedSecond)
+                    {
+                        lastReportedSecond = currentSecond;
+                        OnIntermissionTick?.Invoke(currentSecond);
+                    }
+
+                    OnIntermissionUpdated?.Invoke(_intermissionRemaining, intermissionDuration);
+                    intermissionRemaining -= Time.deltaTime;
+                }
+                else if (!hasNextWave && allSubwavesTriggered && waveFieldClear)
+                {
+                    break;
                 }
 
                 yield return null;
                 waveTimer += Time.deltaTime;
             }
-
-            // Aguarda o término de todas as rotinas de instanciação
-            foreach (Coroutine c in _activeSpawnCoroutines)
-            {
-                if (c != null)
-                {
-                    yield return c;
-                }
-            }
-            _activeSpawnCoroutines.Clear();
-
-            // Aguarda todos os inimigos instanciados morrerem ou alcançarem o final
-            while (aliveEnemiesCount > 0)
-            {
-                yield return new WaitForSeconds(0.25f);
-            }
-
-            isWaveActive = false;
         }
 
-        private IEnumerator SpawnGroupRoutine(SpawnGroup group)
+        private void LaunchSubwave(SubWaveData subwave, WaveRunState waveState)
         {
-            if (group == null || group.EnemyPrefab == null)
+            foreach (SpawnGroup group in subwave.SpawnGroups)
             {
-                Debug.LogWarning("[WaveSpawner] SpawnGroup ignorado: prefab de inimigo nulo!");
-                yield break;
+                waveState.ActiveSpawns++;
+                StartCoroutine(SpawnGroupRoutine(group, waveState));
             }
+        }
 
-            if (group.TargetPath == null)
+        private void LaunchRemainingSubwaves(List<SubWaveData> sortedSubwaves, ref int nextSubwaveIdx, WaveRunState waveState)
+        {
+            while (nextSubwaveIdx < sortedSubwaves.Count)
             {
-                Debug.LogError("[WaveSpawner] SpawnGroup ignorado: TargetPath não atribuído!", this);
-                yield break;
+                LaunchSubwave(sortedSubwaves[nextSubwaveIdx], waveState);
+                nextSubwaveIdx++;
             }
+        }
 
-            if (!pathRegistry.TryGetPath(group.TargetPath, out EnemyPath path) || path == null || path.WaypointCount == 0)
+        private void ClearIntermissionState(float totalDuration)
+        {
+            _isInIntermission = false;
+            _skipIntermissionRequested = false;
+            _intermissionRemaining = 0f;
+            OnIntermissionTick?.Invoke(0f);
+            OnIntermissionUpdated?.Invoke(0f, totalDuration);
+        }
+
+        private IEnumerator SpawnGroupRoutine(SpawnGroup group, WaveRunState waveState)
+        {
+            try
             {
-                Debug.LogError($"[WaveSpawner] Rota '{group.TargetPath.name}' não encontrada ou sem waypoints!", this);
-                yield break;
-            }
-
-            Waypoint startWaypoint = path.StartWaypoint;
-
-            for (int i = 0; i < group.Quantity; i++)
-            {
-                Enemy enemy = Instantiate(group.EnemyPrefab, startWaypoint.Position, Quaternion.identity);
-                aliveEnemiesCount++;
-
-                enemy.Initialize(path.Waypoints);
-
-                // Subscreve nos eventos do inimigo para decrementar a contagem
-                enemy.OnDied += HandleEnemyRemoved;
-                enemy.OnReachedEnd += HandleEnemyRemoved;
-
-                if (i < group.Quantity - 1)
+                if (group == null || group.EnemyPrefab == null)
                 {
-                    yield return new WaitForSeconds(group.Interval);
+                    Debug.LogWarning("[WaveSpawner] SpawnGroup ignorado: prefab de inimigo nulo!");
+                    yield break;
+                }
+
+                if (group.TargetPath == null)
+                {
+                    Debug.LogError("[WaveSpawner] SpawnGroup ignorado: TargetPath não atribuído!", this);
+                    yield break;
+                }
+
+                if (!pathRegistry.TryGetPath(group.TargetPath, out EnemyPath path) || path == null || path.WaypointCount == 0)
+                {
+                    Debug.LogError($"[WaveSpawner] Rota '{group.TargetPath.name}' não encontrada ou sem waypoints!", this);
+                    yield break;
+                }
+
+                Waypoint startWaypoint = path.StartWaypoint;
+                DifficultyProfile difficulty = ActiveDifficulty;
+                int quantity = difficulty != null ? difficulty.GetScaledQuantity(group.Quantity) : group.Quantity;
+                float interval = difficulty != null ? difficulty.GetScaledInterval(group.Interval) : group.Interval;
+
+                for (int i = 0; i < quantity; i++)
+                {
+                    Enemy enemy = Instantiate(group.EnemyPrefab, startWaypoint.Position, Quaternion.identity);
+                    aliveEnemiesCount++;
+
+                    if (difficulty != null)
+                    {
+                        enemy.ApplyDifficulty(
+                            difficulty.EnemyHealthMultiplier,
+                            difficulty.EnemySpeedMultiplier,
+                            difficulty.GoldRewardMultiplier
+                        );
+                    }
+
+                    enemy.Initialize(path.Waypoints);
+
+                    // Subscreve nos eventos do inimigo para decrementar a contagem
+                    enemy.OnDied += HandleEnemyRemoved;
+                    enemy.OnReachedEnd += HandleEnemyRemoved;
+
+                    OnEnemySpawned?.Invoke(enemy);
+
+                    if (i < quantity - 1)
+                    {
+                        yield return new WaitForSeconds(interval);
+                    }
+                }
+            }
+            finally
+            {
+                if (waveState != null)
+                {
+                    waveState.ActiveSpawns = Mathf.Max(0, waveState.ActiveSpawns - 1);
                 }
             }
         }

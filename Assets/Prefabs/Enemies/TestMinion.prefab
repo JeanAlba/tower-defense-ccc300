@@ -127,8 +127,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e859db60e672848d0ace4e390214d021, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Enemies.TestMinionEnemy
-  maxHealth: 60
-  moveSpeed: 3.5
-  goldReward: 10
-  damageToCastle: 1
-  waypointTolerance: 0.15
+  stats: {fileID: 11400000, guid: 07eebc69d6d942e2ba102cfa61877b45, type: 2}
