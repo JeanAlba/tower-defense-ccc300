@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8561ae927a6542c59ee5c746132afa26, type: 3}
+  m_Name: Stats_Brutamontes
+  m_EditorClassIdentifier: Assembly-CSharp::HollowKeep.Enemies.EnemyStatsData
+  enemyName: Brutamontes
+  maxHealth: 320
+  moveSpeed: 1.85
+  goldReward: 30
+  damageToCastle: 3
